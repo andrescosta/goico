@@ -6,6 +6,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/joho/godotenv v1.5.1
 	github.com/rs/zerolog v1.31.0
+	go.etcd.io/bbolt v1.3.8
 	google.golang.org/grpc v1.59.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
