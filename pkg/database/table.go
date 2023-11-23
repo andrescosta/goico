@@ -9,22 +9,22 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-type Serializer[S any] interface {
-	Serialize(uint64, S) ([]byte, error)
-	Deserialize(uint64, []byte) (S, error)
+type Marshaler[S any] interface {
+	Marshal(uint64, S) ([]byte, error)
+	Unmarshal(uint64, []byte) (S, error)
 }
 
 type Table[S any] struct {
-	db         *Database
-	serializer Serializer[S]
-	name       string
+	db        *Database
+	marshaler Marshaler[S]
+	name      string
 }
 
-func GetTable[S any](ctx context.Context, db *Database, name string, serializer Serializer[S]) (*Table[S], error) {
+func GetTable[S any](ctx context.Context, db *Database, name string, marshaler Marshaler[S]) (*Table[S], error) {
 	table := &Table[S]{
-		serializer: serializer,
-		name:       name,
-		db:         db,
+		marshaler: marshaler,
+		name:      name,
+		db:        db,
 	}
 
 	if err := db.db.Update(func(tx *bolt.Tx) error {
@@ -49,7 +49,7 @@ func (s *Table[S]) Add(_ context.Context, data S) (uint64, error) {
 		if err != nil {
 			return err
 		}
-		buf, err := s.serializer.Serialize(id, data)
+		buf, err := s.marshaler.Marshal(id, data)
 		if err != nil {
 			return err
 		}
@@ -71,7 +71,7 @@ func (s *Table[S]) Get(_ context.Context, id uint64) (S, error) {
 			return fmt.Errorf("table does not exist")
 		}
 		var err error
-		data, err = s.serializer.Deserialize(id, b.Get(itob(id)))
+		data, err = s.marshaler.Unmarshal(id, b.Get(itob(id)))
 		if err != nil {
 			return err
 		}
@@ -91,7 +91,7 @@ func (s *Table[S]) All(ctx context.Context) ([]S, error) {
 		}
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			d, err := s.serializer.Deserialize(btoi(k), v)
+			d, err := s.marshaler.Unmarshal(btoi(k), v)
 			if err != nil {
 				logger.Warn().Msgf("Error deserializing data %s", err)
 				continue
