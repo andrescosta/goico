@@ -11,6 +11,7 @@ import (
 
 type Marshaler[S any] interface {
 	Marshal(uint64, S) ([]byte, error)
+	MarshalObj(S) (uint64, []byte, error)
 	Unmarshal(uint64, []byte) (S, error)
 }
 
@@ -61,6 +62,27 @@ func (s *Table[S]) Add(_ context.Context, data S) (uint64, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+func (s *Table[S]) Update(_ context.Context, data S) error {
+	if err := s.db.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(s.name))
+		if b == nil {
+			return fmt.Errorf("table does not exist")
+		}
+		var err error
+		id, buf, err := s.marshaler.MarshalObj(data)
+		if err != nil {
+			return err
+		}
+		if err = b.Put(itob(id), buf); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Table[S]) Get(_ context.Context, id uint64) (S, error) {
