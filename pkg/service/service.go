@@ -21,13 +21,13 @@ func Start(service Service) {
 	ctx = logger.WithContext(ctx)
 
 	if err != nil {
-		logger.Fatal().Msg("Error loading .env file")
+		logger.Fatal().Msgf("Error loading .env file: %s", err)
 	}
 
 	defer func() {
 		done()
 		if r := recover(); r != nil {
-			logger.Fatal()
+			logger.Fatal().Msg("error recovering")
 		}
 	}()
 
@@ -35,6 +35,6 @@ func Start(service Service) {
 	done()
 
 	if err != nil {
-		logger.Fatal().Err(err)
+		logger.Fatal().Msgf("%s", err)
 	}
 }
