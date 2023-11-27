@@ -16,7 +16,8 @@ import (
 type Config struct {
 	Console
 	File
-	Level zerolog.Level
+	Level  zerolog.Level
+	Caller bool
 }
 
 type Console struct {
@@ -35,12 +36,16 @@ type File struct {
 }
 
 func NewUsingEnv() *zerolog.Logger {
+	return NewUsingEnvAndValues(nil)
+}
+func NewUsingEnvAndValues(values map[string]string) *zerolog.Logger {
 	config := Config{
 		Console: Console{
 			Enabled:          env.GetAsBool("log.console.enabled", true),
 			ExcludeTimestamp: env.GetAsBool("log.console.exclude.timestamp", false),
 		},
-		Level: env.GetAsInt("log.level", zerolog.InfoLevel),
+		Level:  env.GetAsInt("log.level", zerolog.InfoLevel),
+		Caller: env.GetAsBool("log.caller", false),
 		File: File{
 			Enabled:          env.GetAsBool("log.file.enabled", false),
 			EncodeLogsAsJson: env.GetAsBool("log.file.json", false),
@@ -51,10 +56,10 @@ func NewUsingEnv() *zerolog.Logger {
 			MaxAge:           env.GetAsInt("log.file.max.age", 24),
 		},
 	}
-	return New(config)
+	return New(values, config)
 }
 
-func New(config Config) *zerolog.Logger {
+func New(values map[string]string, config Config) *zerolog.Logger {
 	var writers []io.Writer
 
 	if config.Console.Enabled {
@@ -67,7 +72,17 @@ func New(config Config) *zerolog.Logger {
 
 	zerolog.SetGlobalLevel(config.Level)
 
-	logger := zerolog.New(mw).With().Timestamp().Logger()
+	ctx := zerolog.New(mw).With().Timestamp()
+
+	if config.Caller {
+		ctx = ctx.Caller()
+	}
+
+	for k, v := range values {
+		ctx = ctx.Str(k, v)
+	}
+
+	logger := ctx.Logger()
 
 	return &logger
 }
