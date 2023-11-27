@@ -20,8 +20,7 @@ type Server struct {
 	listener net.Listener
 }
 
-func New(port string) (*Server, error) {
-	addr := fmt.Sprintf(":" + port)
+func New(addr string) (*Server, error) {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create listener on %s: %w", addr, err)
