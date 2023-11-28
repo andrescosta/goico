@@ -23,6 +23,20 @@ func WriteToRandomFile(path, preffix, suffix string, data []byte) error {
 	return WriteToFile(fullpath, data)
 }
 
+func FileExists(fullPath string) (bool, error) {
+	if _, err := os.Stat(fullPath); err == nil {
+		return true, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
+func Touch(file string) error {
+	return WriteToFile(file, []byte(""))
+}
+
 func WriteToFile(file string, data []byte) error {
 	f, err := os.Create(file)
 	if err != nil {
@@ -185,9 +199,7 @@ loop:
 						}
 					}
 					if appendLine {
-						if noincludecrlf {
-							currLine = strings.TrimSpace(currLine)
-						}
+						currLine = removeCRLF(noincludecrlf, currLine)
 						accLines = append(accLines, currLine)
 						if nlines == len(accLines) {
 							break loop
@@ -200,6 +212,7 @@ loop:
 		}
 		if newOffset == 0 {
 			if currLine != "" {
+				currLine = removeCRLF(noincludecrlf, currLine)
 				accLines = append(accLines, currLine)
 			}
 			break loop
@@ -214,4 +227,11 @@ loop:
 	}
 	slices.Reverse(accLines)
 	return accLines, nil
+}
+
+func removeCRLF(noincludecrlf bool, currLine string) string {
+	if noincludecrlf {
+		currLine = strings.TrimSpace(currLine)
+	}
+	return currLine
 }
