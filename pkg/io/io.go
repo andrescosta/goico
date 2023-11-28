@@ -3,10 +3,12 @@ package io
 import (
 	"bufio"
 	"errors"
+	"io"
 	"io/fs"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,22 +26,20 @@ func WriteToRandomFile(path, preffix, suffix string, data []byte) error {
 func WriteToFile(file string, data []byte) error {
 	f, err := os.Create(file)
 	if err != nil {
-		return errors.Join(errors.New("Error creating file"), err)
+		return errors.Join(errors.New("error creating file"), err)
 	}
 	defer func() {
-		if err := f.Close(); err != nil {
-			// log
-		}
+		f.Close()
 	}()
 
 	w := bufio.NewWriter(f)
 
 	if _, err := w.Write(data); err != nil {
-		return errors.Join(errors.New("Error writing file"), err)
+		return errors.Join(errors.New("error writing file"), err)
 	}
 
 	if err := w.Flush(); err != nil {
-		return errors.Join(errors.New("Error flushing data"), err)
+		return errors.Join(errors.New("error flushing data"), err)
 	}
 	return nil
 }
@@ -78,7 +78,7 @@ func getFilesSorted(path string, preffix, suffix string) ([]os.DirEntry, error) 
 	})
 
 	if err != nil {
-		return nil, errors.Join(errors.New("Error getting files"), err)
+		return nil, errors.Join(errors.New("error getting files"), err)
 	}
 	sort.Slice(files, func(i, j int) bool {
 		in1, _ := files[i].Info()
@@ -147,4 +147,76 @@ func BuildFullPathWithFile(directories []string, file string) string {
 
 func BuildPathWithFile(path, file string) string {
 	return filepath.Join(path, file)
+}
+
+func GetLastnLines(file string, nlines int, skipEmpty bool, noincludecrlf bool) ([]string, error) {
+	bufferSize := int64(4096)
+	fileHandle, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer fileHandle.Close()
+	stat, err := fileHandle.Stat()
+	if err != nil {
+		return nil, err
+	}
+	filesize := stat.Size()
+	if bufferSize > filesize {
+		bufferSize = filesize
+	}
+	cursor := -bufferSize
+	buffer := make([]byte, bufferSize)
+	accLines := make([]string, 0)
+	currLine := ""
+loop:
+	for {
+		newOffset, err := fileHandle.Seek(cursor, io.SeekEnd)
+		if err != nil {
+			return nil, err
+		}
+		bytesRead, err := fileHandle.Read(buffer)
+		if err != nil {
+			return nil, err
+		}
+		for i := bytesRead - 1; i >= 0; i-- {
+			if buffer[i] == '\n' || buffer[i] == '\r' {
+				// if line break is CRLF, we skip the character
+				if currLine != "\n" {
+					if skipEmpty {
+						if strings.TrimSpace(currLine) != "" {
+							if noincludecrlf {
+								currLine = strings.TrimSpace(currLine)
+							}
+							accLines = append(accLines, currLine)
+						}
+					} else {
+						if noincludecrlf {
+							currLine = strings.TrimSpace(currLine)
+						}
+						accLines = append(accLines, currLine)
+					}
+					currLine = ""
+					if nlines == len(accLines) {
+						break loop
+					}
+				}
+			}
+			currLine = string(buffer[i]) + currLine
+		}
+		if newOffset == 0 {
+			if currLine != "" {
+				accLines = append(accLines, currLine)
+			}
+			break loop
+		}
+		if newOffset > bufferSize {
+			cursor -= int64(bytesRead)
+		} else {
+			// We are at the beginning of the file. We cannot move beyond that.
+			cursor -= newOffset
+			buffer = make([]byte, newOffset)
+		}
+	}
+	slices.Reverse(accLines)
+	return accLines, nil
 }
