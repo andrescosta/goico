@@ -1,4 +1,4 @@
-package io
+package iohelper
 
 import (
 	"bufio"
@@ -43,10 +43,6 @@ func WriteToFile(file string, data []byte) error {
 	}
 	return nil
 }
-
-/*func GetDirectoriesEntry(path os.DirEntry) ([]os.DirEntry, error) {
-return GetDirectories(
-}*/
 
 func GetSubDirectories(path string) ([]string, error) {
 	dires, err := os.ReadDir(path)
@@ -180,25 +176,24 @@ loop:
 		}
 		for i := bytesRead - 1; i >= 0; i-- {
 			if buffer[i] == '\n' || buffer[i] == '\r' {
-				// if line break is CRLF, we skip the character
+				// not a new line because line break is CRLF(\n\r),
 				if currLine != "\n" {
+					appendLine := true
 					if skipEmpty {
-						if strings.TrimSpace(currLine) != "" {
-							if noincludecrlf {
-								currLine = strings.TrimSpace(currLine)
-							}
-							accLines = append(accLines, currLine)
+						if strings.TrimSpace(currLine) == "" {
+							appendLine = false
 						}
-					} else {
+					}
+					if appendLine {
 						if noincludecrlf {
 							currLine = strings.TrimSpace(currLine)
 						}
 						accLines = append(accLines, currLine)
+						if nlines == len(accLines) {
+							break loop
+						}
 					}
 					currLine = ""
-					if nlines == len(accLines) {
-						break loop
-					}
 				}
 			}
 			currLine = string(buffer[i]) + currLine
