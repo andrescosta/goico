@@ -15,9 +15,10 @@ import (
 )
 
 type Server struct {
-	ip       string
-	port     string
-	listener net.Listener
+	ip        string
+	port      string
+	startTime time.Time
+	listener  net.Listener
 }
 
 func New(addr string) (*Server, error) {
@@ -49,6 +50,7 @@ func (s *Server) ServeHTTP(ctx context.Context, srv *http.Server) error {
 	}()
 
 	logger.Debug().Msgf("HTTP server: started on %s", s.Addr())
+	s.startTime = time.Now()
 	if err := srv.Serve(s.listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
@@ -75,6 +77,7 @@ func (s *Server) ServeGRPC(ctx context.Context, srv *grpc.Server) error {
 	}()
 
 	logger.Debug().Msgf("GRPC Server: started on %s", s.Addr())
+	s.startTime = time.Now()
 	if err := srv.Serve(s.listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
