@@ -9,6 +9,7 @@ require (
 	go.etcd.io/bbolt v1.3.8
 	google.golang.org/grpc v1.59.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (

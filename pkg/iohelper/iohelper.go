@@ -97,6 +97,51 @@ func getFilesSorted(path string, preffix, suffix string) ([]os.DirEntry, error) 
 	})
 	return files, nil
 }
+func GetFiles(path string) ([]os.DirEntry, error) {
+	return getFiles(path, func(d fs.DirEntry) bool {
+		return !d.IsDir()
+	})
+}
+
+func GetDirs(path string) ([]os.DirEntry, error) {
+	f, err := getFiles(path, func(d fs.DirEntry) bool {
+		return d.IsDir()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return f[1:], nil
+}
+
+func getFiles(path string, filter func(fs.DirEntry) bool) ([]os.DirEntry, error) {
+	var files []fs.DirEntry
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return files, nil
+	}
+
+	err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
+
+		if err != nil {
+			return err
+		}
+		if filter(d) {
+			files = append(files, d)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, errors.Join(errors.New("error getting files"), err)
+	}
+	sort.Slice(files, func(i, j int) bool {
+		in1, _ := files[i].Info()
+		in2, _ := files[j].Info()
+		return in1.ModTime().Unix() < in2.ModTime().Unix()
+	})
+
+	return files, nil
+}
 
 func getNFilesSorted(path, preffix, suffix string, n int) ([]os.DirEntry, error) {
 	files, err := getFilesSorted(path, preffix, suffix)

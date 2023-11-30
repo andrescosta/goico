@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -10,9 +9,9 @@ import (
 )
 
 type Marshaler[S any] interface {
-	Marshal(uint64, S) ([]byte, error)
-	MarshalObj(S) (uint64, []byte, error)
-	Unmarshal(uint64, []byte) (S, error)
+	Marshal(S) ([]byte, error)
+	MarshalObj(S) (string, []byte, error)
+	Unmarshal([]byte) (S, error)
 }
 
 type Table[S any] struct {
@@ -46,15 +45,11 @@ func (s *Table[S]) Add(_ context.Context, data S) (uint64, error) {
 			return fmt.Errorf("table does not exist")
 		}
 		var err error
-		id, err = b.NextSequence()
+		id, buf, err := s.marshaler.MarshalObj(data)
 		if err != nil {
 			return err
 		}
-		buf, err := s.marshaler.Marshal(id, data)
-		if err != nil {
-			return err
-		}
-		if err = b.Put(itob(id), buf); err != nil {
+		if err = b.Put([]byte(id), buf); err != nil {
 			return err
 		}
 		return nil
@@ -75,7 +70,7 @@ func (s *Table[S]) Update(_ context.Context, data S) error {
 		if err != nil {
 			return err
 		}
-		if err = b.Put(itob(id), buf); err != nil {
+		if err = b.Put([]byte(id), buf); err != nil {
 			return err
 		}
 		return nil
@@ -85,20 +80,25 @@ func (s *Table[S]) Update(_ context.Context, data S) error {
 	return nil
 }
 
-func (s *Table[S]) Get(_ context.Context, id uint64) (S, error) {
-	var data S
-	s.db.db.View(func(tx *bolt.Tx) error {
+func (s *Table[S]) Get(_ context.Context, id string) (*S, error) {
+	var data *S = nil
+	if err := s.db.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(s.name))
 		if b == nil {
 			return fmt.Errorf("table does not exist")
 		}
-		var err error
-		data, err = s.marshaler.Unmarshal(id, b.Get(itob(id)))
-		if err != nil {
-			return err
+		d := b.Get([]byte(id))
+		if d != nil {
+			e, err := s.marshaler.Unmarshal(d)
+			if err != nil {
+				return err
+			}
+			data = &e
 		}
 		return nil
-	})
+	}); err != nil {
+		return nil, err
+	}
 	return data, nil
 }
 
@@ -113,7 +113,7 @@ func (s *Table[S]) All(ctx context.Context) ([]S, error) {
 		}
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			d, err := s.marshaler.Unmarshal(btoi(k), v)
+			d, err := s.marshaler.Unmarshal(v)
 			if err != nil {
 				logger.Warn().Msgf("Error deserializing data %s", err)
 				continue
@@ -126,14 +126,4 @@ func (s *Table[S]) All(ctx context.Context) ([]S, error) {
 		return nil, err
 	}
 	return data, nil
-}
-
-func itob(v uint64) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, v)
-	return b
-}
-
-func btoi(v []byte) uint64 {
-	return binary.BigEndian.Uint64(v)
 }
