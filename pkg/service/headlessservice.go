@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -30,6 +31,8 @@ func (s HeadlessService) Serve() error {
 			logger.Fatal().Msg("error recovering")
 		}
 	}()
+	logger.Info().Msgf("Starting process %d ", os.Getpid())
+
 	s.Service.StartTime = time.Now()
 	err := s.serve(ctx)
 	done()

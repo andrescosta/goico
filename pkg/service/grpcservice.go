@@ -17,14 +17,29 @@ import (
 
 type GrpcService struct {
 	*Service
-	grpcServer *grpc.Server
+	grpcServer       *grpc.Server
+	closeableHandler Closeable
 }
 
-func NewGrpService(ctx context.Context, name string, desc *grpc.ServiceDesc, impl any) (*GrpcService, error) {
+type Closeable interface {
+	Close() error
+}
+
+func NewGrpService(ctx context.Context, name string, desc *grpc.ServiceDesc, initHandler func(context.Context) (any, error)) (*GrpcService, error) {
 	svc := GrpcService{}
 	svc.Service = NewService(ctx, name)
 	s := grpc.NewServer()
-	s.RegisterService(desc, impl)
+	h, err := initHandler(svc.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ha, ok := h.(Closeable)
+	if ok {
+		svc.closeableHandler = ha
+	}
+
+	s.RegisterService(desc, h)
 	reflection.Register(s)
 	svc.grpcServer = s
 	return &svc, nil
@@ -40,6 +55,8 @@ func (sh *GrpcService) Serve() error {
 			logger.Fatal().Msg("error recovering")
 		}
 	}()
+
+	logger.Info().Msgf("Starting process %d ", os.Getpid())
 
 	listener, err := net.Listen("tcp", sh.Service.Addr)
 	if err != nil {
@@ -58,7 +75,15 @@ func (sh *GrpcService) Serve() error {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
 	logger.Debug().Msg("GRPC Server: stopped")
+
 	done()
 	logger.Info().Msgf("Process %d ended ", os.Getpid())
 	return nil
+}
+
+func (sh *GrpcService) Dispose() {
+	if sh.closeableHandler != nil {
+		zerolog.Ctx(sh.ctx).Debug().Msg("handler closed")
+		sh.closeableHandler.Close()
+	}
 }
