@@ -2,50 +2,37 @@ package service
 
 import (
 	"context"
-	"os"
-	"os/signal"
-	"syscall"
+	"time"
 
 	"github.com/andrescosta/goico/pkg/config"
+	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/log"
 	"github.com/rs/zerolog"
 )
 
-type Service func(context.Context) error
-
-func Start(service Service) {
-	StartNamed("", service)
+type Service struct {
+	Name      string
+	Addr      string
+	StartTime time.Time
+	ctx       context.Context
 }
-func StartNamed(name string, service Service) {
-	ctx, done := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
+func NewService(ctx context.Context, name string) *Service {
 	err := config.LoadEnvVariables()
 	var logger *zerolog.Logger
+
 	if name != "" {
 		logger = log.NewUsingEnvAndValues(map[string]string{"service": name})
 	} else {
 		logger = log.NewUsingEnv()
-
 	}
 
 	ctx = logger.WithContext(ctx)
-
 	if err != nil {
 		logger.Fatal().Msgf("Error loading .env file: %s", err)
 	}
 
-	defer func() {
-		done()
-		if r := recover(); r != nil {
-			logger.Fatal().Msg("error recovering")
-		}
-	}()
-
-	logger.Info().Msgf("Starting process %d ", os.Getpid())
-	err = service(ctx)
-	done()
-	if err != nil {
-		logger.Fatal().Msgf("%s", err)
-	}
-	logger.Info().Msgf("Process %d ended ", os.Getpid())
+	return &Service{Name: name,
+		Addr: env.GetAsString(name + ".addr"),
+		ctx:  ctx}
 }

@@ -1,18 +1,16 @@
-package server
+package service
 
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi"
 )
 
 type Info struct {
-	Name            string
-	BuildId         string
-	LastStartupTime time.Time
-	Env             map[string]string
+	Name    string
+	BuildId string
+	Env     map[string]string
 }
 
 func InfoResource(r *chi.Mux, info Info) {

@@ -4,7 +4,6 @@ go 1.21.4
 
 require (
 	github.com/go-chi/chi v1.5.5
-	github.com/hashicorp/go-multierror v1.1.1
 	github.com/joho/godotenv v1.5.1
 	github.com/rs/zerolog v1.31.0
 	go.etcd.io/bbolt v1.3.8
@@ -15,7 +14,6 @@ require (
 
 require (
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	golang.org/x/net v0.14.0 // indirect
