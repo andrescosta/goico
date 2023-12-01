@@ -1,4 +1,4 @@
-package service
+package svcinfo
 
 import (
 	"encoding/json"

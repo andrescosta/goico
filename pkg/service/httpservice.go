@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 )
 
@@ -21,12 +21,12 @@ type HttpService struct {
 	server *http.Server
 }
 
-func NewHttpService(ctx context.Context, name string, initHandler func(context.Context) http.Handler) *HttpService {
+func NewHttpService(ctx context.Context, name, resource string, initHandler func(context.Context) chi.Router) *HttpService {
 	svc := HttpService{}
 	svc.Service = NewService(ctx, name)
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
-	router.Mount("/"+name, initHandler(ctx))
+	router.Mount("/"+resource, initHandler(ctx))
 	svc.server = &http.Server{Handler: router}
 	return &svc
 }

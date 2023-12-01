@@ -33,8 +33,15 @@ func FileExists(fullPath string) (bool, error) {
 	}
 }
 
-func Touch(file string) error {
-	return WriteToFile(file, []byte(""))
+func CreateEmptyIfNotExists(fullpath string) error {
+	e, err := FileExists(fullpath)
+	if err != nil {
+		return err
+	}
+	if !e {
+		return WriteToFile(fullpath, []byte(""))
+	}
+	return nil
 }
 
 func WriteToFile(file string, data []byte) error {
