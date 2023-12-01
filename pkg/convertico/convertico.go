@@ -6,7 +6,7 @@ import (
 	"github.com/andrescosta/goico/pkg/reflectico"
 )
 
-func ConvertSlices[T, S any](sliceT []T) []S {
+func SliceWithSlice[T, S any](sliceT []T) []S {
 	sliceS := make([]S, len(sliceT))
 	if len(sliceT) > 0 {
 		if !reflectico.CanConvert[S](sliceT[0]) {
@@ -29,4 +29,20 @@ func Itob(v uint64) []byte {
 
 func Btoi(v []byte) uint64 {
 	return binary.BigEndian.Uint64(v)
+}
+
+func SliceWithFunc[T, Y any](d []T, g func(T) Y) []Y {
+	r := make([]Y, 0)
+	for _, ee := range d {
+		r = append(r, g(ee))
+	}
+	return r
+}
+
+func SliceWithFuncName[T, Y any](name string, d []T, g func(string, T) Y) []Y {
+	r := make([]Y, 0)
+	for _, ee := range d {
+		r = append(r, g(name, ee))
+	}
+	return r
 }
