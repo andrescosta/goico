@@ -14,7 +14,7 @@ type Service struct {
 	Name      string
 	Addr      string
 	StartTime time.Time
-	ctx       context.Context
+	Ctx       context.Context
 }
 
 func NewService(ctx context.Context, name string) *Service {
@@ -34,5 +34,5 @@ func NewService(ctx context.Context, name string) *Service {
 
 	return &Service{Name: name,
 		Addr: env.GetAsString(name + ".addr"),
-		ctx:  ctx}
+		Ctx:  ctx}
 }

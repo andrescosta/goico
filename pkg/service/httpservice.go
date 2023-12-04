@@ -32,8 +32,8 @@ func NewHttpService(ctx context.Context, name, resource string, initHandler func
 }
 
 func (sh *HttpService) Serve() error {
-	logger := zerolog.Ctx(sh.ctx)
-	ctx, done := signal.NotifyContext(sh.ctx, syscall.SIGINT, syscall.SIGTERM)
+	logger := zerolog.Ctx(sh.Ctx)
+	ctx, done := signal.NotifyContext(sh.Ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer func() {
 		done()
 		if r := recover(); r != nil {

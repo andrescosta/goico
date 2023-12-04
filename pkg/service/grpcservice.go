@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	info "github.com/andrescosta/goico/pkg/service/info/grpc"
+	"github.com/andrescosta/goico/pkg/service/svcmeta"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -33,7 +33,7 @@ func EmptyhealthCheckHandler(context.Context) error {
 	return nil
 }
 
-func NewGrpService(ctx context.Context, name string, desc *grpc.ServiceDesc,
+func NewGrpcService(ctx context.Context, name string, desc *grpc.ServiceDesc,
 	initHandler func(context.Context) (any, error),
 	healthCheckHandler func(context.Context) error) (*GrpcService, error) {
 	svc := GrpcService{}
@@ -46,7 +46,7 @@ func NewGrpService(ctx context.Context, name string, desc *grpc.ServiceDesc,
 
 	s := grpc.NewServer(sopts...)
 
-	h, err := initHandler(svc.ctx)
+	h, err := initHandler(svc.Ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -62,14 +62,14 @@ func NewGrpService(ctx context.Context, name string, desc *grpc.ServiceDesc,
 	healthcheck := health.NewServer()
 	healthpb.RegisterHealthServer(s, healthcheck)
 
-	info.RegisterSvcInfoServer(s, NewGrpcServerInfo(&svc))
+	svcmeta.RegisterGrpcMetadataServer(s, NewGrpcServerInfo(&svc))
 
 	svc.grpcServer = s
 
 	healthcheck.SetServingStatus(name, healthpb.HealthCheckResponse_SERVING)
-
-	go check(ctx, name, healthcheck, healthCheckHandler)
-
+	if healthCheckHandler != nil {
+		go check(ctx, name, healthcheck, healthCheckHandler)
+	}
 	return &svc, nil
 }
 
@@ -102,9 +102,9 @@ func (sh *GrpcService) Info() map[string]string {
 }
 
 func (sh *GrpcService) Serve() error {
-	logger := zerolog.Ctx(sh.ctx)
+	logger := zerolog.Ctx(sh.Ctx)
 
-	ctx, done := signal.NotifyContext(sh.ctx, syscall.SIGINT, syscall.SIGTERM)
+	ctx, done := signal.NotifyContext(sh.Ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer func() {
 		done()
 		if r := recover(); r != nil {
@@ -114,9 +114,9 @@ func (sh *GrpcService) Serve() error {
 
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
 
-	listener, err := net.Listen("tcp", sh.Service.Addr)
+	listener, err := net.Listen("tcp", sh.Addr)
 	if err != nil {
-		return fmt.Errorf("failed to create listener on %s: %w", sh.Service.Addr, err)
+		return fmt.Errorf("failed to create listener on %s: %w", sh.Addr, err)
 	}
 
 	go func() {
@@ -139,7 +139,7 @@ func (sh *GrpcService) Serve() error {
 
 func (sh *GrpcService) Dispose() {
 	if sh.closeableHandler != nil {
-		zerolog.Ctx(sh.ctx).Debug().Msg("handler closed")
+		zerolog.Ctx(sh.Ctx).Debug().Msg("handler closed")
 		sh.closeableHandler.Close()
 	}
 }

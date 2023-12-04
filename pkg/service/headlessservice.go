@@ -23,8 +23,8 @@ func NewHeadlessService(ctx context.Context, name string, serve func(ctx context
 }
 
 func (s HeadlessService) Serve() error {
-	logger := zerolog.Ctx(s.ctx)
-	ctx, done := signal.NotifyContext(s.ctx, syscall.SIGINT, syscall.SIGTERM)
+	logger := zerolog.Ctx(s.Ctx)
+	ctx, done := signal.NotifyContext(s.Ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer func() {
 		done()
 		if r := recover(); r != nil {

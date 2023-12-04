@@ -3,11 +3,11 @@ package service
 import (
 	context "context"
 
-	info "github.com/andrescosta/goico/pkg/service/info/grpc"
+	"github.com/andrescosta/goico/pkg/service/svcmeta"
 )
 
 type GrpcServerInfo struct {
-	info.UnimplementedSvcInfoServer
+	svcmeta.UnimplementedGrpcMetadataServer
 	svc *GrpcService
 }
 
@@ -17,14 +17,14 @@ func NewGrpcServerInfo(svc *GrpcService) *GrpcServerInfo {
 	}
 }
 
-func (g *GrpcServerInfo) Info(ctx context.Context, req *info.InfoRequest) (*info.InfoResponse, error) {
-	i := make([]*info.Info, 0)
+func (g *GrpcServerInfo) Metadata(ctx context.Context, req *svcmeta.GrpcMetadataRequest) (*svcmeta.GrpcMetadataReply, error) {
+	i := make([]*svcmeta.GrpcServerMetadata, 0)
 	for k, v := range g.svc.Info() {
-		i = append(i, &info.Info{
+		i = append(i, &svcmeta.GrpcServerMetadata{
 			Key:   k,
 			Value: v,
 		})
 	}
 
-	return &info.InfoResponse{Info: i}, nil
+	return &svcmeta.GrpcMetadataReply{Metadata: i}, nil
 }

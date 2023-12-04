@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option go_package = "/svcmeta";
+
+
+message GrpcMetadataRequest {
+    string service = 1;
+}
+  
+message GrpcMetadataReply {
+    repeated GrpcServerMetadata metadata = 1;
+}
+
+message GrpcServerMetadata {
+    string key = 1;
+    string value = 2;
+}
+
+service GrpcMetadata {
+    rpc Metadata(GrpcMetadataRequest) returns (GrpcMetadataReply);
+}
