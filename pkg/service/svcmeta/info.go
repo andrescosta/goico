@@ -1,13 +1,6 @@
-package svcinfo
+package svcmeta
 
-import (
-	"encoding/json"
-	"net/http"
-
-	"github.com/go-chi/chi"
-)
-
-type Info struct {
+/*type Info struct {
 	Name    string
 	BuildId string
 	Env     map[string]string
@@ -24,3 +17,4 @@ func InfoResource(r *chi.Mux, info Info) {
 		_, _ = w.Write(res)
 	})
 }
+*/

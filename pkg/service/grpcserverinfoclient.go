@@ -3,14 +3,14 @@ package service
 import (
 	"context"
 
-	pb "github.com/andrescosta/goico/pkg/service/info/grpc"
+	"github.com/andrescosta/goico/pkg/service/svcmeta"
 	"google.golang.org/grpc"
 )
 
 type GrpcServerInfoClient struct {
 	serverAddr string
 	conn       *grpc.ClientConn
-	client     pb.SvcInfoClient
+	client     svcmeta.GrpcMetadataClient
 }
 
 func NewGrpcServerInfoClient(host string) (*GrpcServerInfoClient, error) {
@@ -18,7 +18,7 @@ func NewGrpcServerInfoClient(host string) (*GrpcServerInfoClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	client := pb.NewSvcInfoClient(conn)
+	client := svcmeta.NewGrpcMetadataClient(conn)
 	return &GrpcServerInfoClient{
 		serverAddr: host,
 		conn:       conn,
@@ -30,11 +30,11 @@ func (c *GrpcServerInfoClient) Close() {
 	c.conn.Close()
 }
 
-func (c *GrpcServerInfoClient) Info(ctx context.Context, in *pb.InfoRequest) ([]*pb.Info, error) {
-	r, err := c.client.Info(ctx, &pb.InfoRequest{})
+func (c *GrpcServerInfoClient) Info(ctx context.Context, in *svcmeta.GrpcMetadataRequest) ([]*svcmeta.GrpcServerMetadata, error) {
+	r, err := c.client.Metadata(ctx, in)
 	if err != nil {
 		return nil, err
 	}
-	return r.Info, nil
+	return r.Metadata, nil
 
 }

@@ -27,3 +27,12 @@ func CanConvert[S any](i interface{}) bool {
 	t2 := reflect.TypeOf(a)
 	return t1.ConvertibleTo(t2)
 }
+
+func NewInstance[T any](t T) T {
+	s := reflect.ValueOf(t)
+	if s.Kind() == reflect.Ptr {
+		s = reflect.Indirect(s)
+	}
+	n := reflect.New(s.Type()).Interface().(T)
+	return n
+}
