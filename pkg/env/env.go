@@ -3,24 +3,33 @@ package env
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 func GetAsString(key string, value ...string) string {
 	s, ok := os.LookupEnv(key)
 	if !ok {
-		return getDefault("", value)
+		return getDefault(value, "")
 	}
 	return s
+}
+
+func GetOrNil(key string) *string {
+	s, ok := os.LookupEnv(key)
+	if !ok {
+		return nil
+	}
+	return &s
 }
 
 func GetAsInt[T ~int | ~int32 | ~int8 | ~int64](key string, value ...T) T {
 	s, ok := os.LookupEnv(key)
 	if !ok {
-		return getDefault(0, value)
+		return getDefault(value, 0)
 	}
 	v, err := strconv.Atoi(s)
 	if err != nil {
-		return getDefault(0, value)
+		return getDefault(value, 0)
 	}
 	return T(v)
 }
@@ -28,16 +37,21 @@ func GetAsInt[T ~int | ~int32 | ~int8 | ~int64](key string, value ...T) T {
 func GetAsBool(key string, value ...bool) bool {
 	s, ok := os.LookupEnv(key)
 	if !ok {
-		return getDefault(false, value)
+		return getDefault(value, false)
 	}
 	v, err := strconv.ParseBool(s)
 	if err != nil {
-		return getDefault(false, value)
+		return getDefault(value, false)
 	}
 	return v
 }
 
-func getDefault[T any](default1 T, values []T) T {
+func GetCommaArray(key string, def string) []string {
+	v := GetAsString(key, def)
+	return strings.Split(v, ",")
+}
+
+func getDefault[T any](values []T, default1 T) T {
 	if len(values) == 0 {
 		return default1
 	} else {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/andrescosta/goico/pkg/config"
@@ -11,13 +12,18 @@ import (
 )
 
 type Service struct {
-	Name      string
-	Addr      string
-	StartTime time.Time
-	Ctx       context.Context
+	name      string
+	svcType   string
+	addr      *string
+	startTime time.Time
+	ctx       context.Context
 }
 
-func NewService(ctx context.Context, name string) *Service {
+var (
+	ErrNotAddress = errors.New("the address was not configured")
+)
+
+func newService(ctx context.Context, name string, svcType string) *Service {
 	err := config.LoadEnvVariables()
 	var logger *zerolog.Logger
 
@@ -31,8 +37,9 @@ func NewService(ctx context.Context, name string) *Service {
 	if err != nil {
 		logger.Fatal().Msgf("Error loading .env file: %s", err)
 	}
-
-	return &Service{Name: name,
-		Addr: env.GetAsString(name + ".addr"),
-		Ctx:  ctx}
+	addr := env.GetOrNil(name + ".addr")
+	return &Service{name: name,
+		addr:    addr,
+		ctx:     ctx,
+		svcType: svcType}
 }

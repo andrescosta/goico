@@ -1,11 +1,13 @@
 package svcmeta
 
-/*type Info struct {
+type Info struct {
 	Name    string
+	Version string
 	BuildId string
 	Env     map[string]string
 }
 
+/*
 func InfoResource(r *chi.Mux, info Info) {
 	r.Get("/info", func(w http.ResponseWriter, r *http.Request) {
 		res, err := json.Marshal(info)

@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andrescosta/goico/pkg/service/obs"
 	"github.com/andrescosta/goico/pkg/service/svcmeta"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -29,24 +30,27 @@ type Closeable interface {
 	Close() error
 }
 
-func EmptyhealthCheckHandler(context.Context) error {
-	return nil
+func NewGrpcService(ctx context.Context, name string, desc *grpc.ServiceDesc,
+	initHandler func(context.Context) (any, error)) (*GrpcService, error) {
+	return newGrpcService(ctx, name, desc, initHandler, nil)
 }
 
-func NewGrpcService(ctx context.Context, name string, desc *grpc.ServiceDesc,
+func NewGrpcServiceWithHealthCheck(ctx context.Context, name string, desc *grpc.ServiceDesc,
+	initHandler func(context.Context) (any, error),
+	healthCheckHandler func(context.Context) error) (*GrpcService, error) {
+	return newGrpcService(ctx, name, desc, initHandler, healthCheckHandler)
+}
+
+func newGrpcService(ctx context.Context, name string, desc *grpc.ServiceDesc,
 	initHandler func(context.Context) (any, error),
 	healthCheckHandler func(context.Context) error) (*GrpcService, error) {
 	svc := GrpcService{}
-	svc.Service = NewService(ctx, name)
+	svc.Service = newService(ctx, name, "grpc")
 	var sopts []grpc.ServerOption
+	sopts = append(sopts, obs.StatsForOtel())
+	server := grpc.NewServer(sopts...)
 
-	// sopts = append(sopts, grpc.StatsHandler(&Handler{}))
-	// sopts = append(sopts, grpc.StatsHandler(&ocgrpc.ServerHandler{}))
-	//"go.opencensus.io/plugin/ocgrpc"
-
-	s := grpc.NewServer(sopts...)
-
-	h, err := initHandler(svc.Ctx)
+	h, err := initHandler(svc.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -56,15 +60,15 @@ func NewGrpcService(ctx context.Context, name string, desc *grpc.ServiceDesc,
 		svc.closeableHandler = ha
 	}
 
-	s.RegisterService(desc, h)
-	reflection.Register(s)
+	server.RegisterService(desc, h)
+	reflection.Register(server)
 
 	healthcheck := health.NewServer()
-	healthpb.RegisterHealthServer(s, healthcheck)
+	healthpb.RegisterHealthServer(server, healthcheck)
 
-	svcmeta.RegisterGrpcMetadataServer(s, NewGrpcServerInfo(&svc))
+	svcmeta.RegisterGrpcMetadataServer(server, NewGrpcServerInfo(&svc))
 
-	svc.grpcServer = s
+	svc.grpcServer = server
 
 	healthcheck.SetServingStatus(name, healthpb.HealthCheckResponse_SERVING)
 	if healthCheckHandler != nil {
@@ -94,17 +98,17 @@ func check(ctx context.Context, name string, healthcheck *health.Server, healthC
 	}
 }
 
-func (sh *GrpcService) Info() map[string]string {
-	return map[string]string{"Name": sh.Name,
-		"Addr":       sh.Addr,
-		"Start Time": sh.StartTime.String(),
+func (g *GrpcService) Info() map[string]string {
+	return map[string]string{"Name": g.name,
+		"Addr":       *g.addr,
+		"Start Time": g.startTime.String(),
 		"Type":       "GRPC"}
 }
 
-func (sh *GrpcService) Serve() error {
-	logger := zerolog.Ctx(sh.Ctx)
+func (g *GrpcService) Serve() error {
+	logger := zerolog.Ctx(g.ctx)
 
-	ctx, done := signal.NotifyContext(sh.Ctx, syscall.SIGINT, syscall.SIGTERM)
+	ctx, done := signal.NotifyContext(g.ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer func() {
 		done()
 		if r := recover(); r != nil {
@@ -114,20 +118,23 @@ func (sh *GrpcService) Serve() error {
 
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
 
-	listener, err := net.Listen("tcp", sh.Addr)
+	if g.addr == nil {
+		return ErrNotAddress
+	}
+	listener, err := net.Listen("tcp", *g.addr)
 	if err != nil {
-		return fmt.Errorf("failed to create listener on %s: %w", sh.Addr, err)
+		return fmt.Errorf("failed to create listener on %s: %w", *g.addr, err)
 	}
 
 	go func() {
 		<-ctx.Done()
 		logger.Debug().Msg("GRPC Server: shutting down")
-		sh.grpcServer.GracefulStop()
+		g.grpcServer.GracefulStop()
 	}()
 
-	logger.Debug().Msgf("GRPC Server: started on %s", sh.Addr)
-	sh.StartTime = time.Now()
-	if err := sh.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+	logger.Debug().Msgf("GRPC Server: started on %s", *g.addr)
+	g.startTime = time.Now()
+	if err := g.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
 	logger.Debug().Msg("GRPC Server: stopped")
@@ -137,9 +144,9 @@ func (sh *GrpcService) Serve() error {
 	return nil
 }
 
-func (sh *GrpcService) Dispose() {
-	if sh.closeableHandler != nil {
-		zerolog.Ctx(sh.Ctx).Debug().Msg("handler closed")
-		sh.closeableHandler.Close()
+func (g *GrpcService) Dispose() {
+	if g.closeableHandler != nil {
+		zerolog.Ctx(g.ctx).Debug().Msg("handler closed")
+		g.closeableHandler.Close()
 	}
 }
