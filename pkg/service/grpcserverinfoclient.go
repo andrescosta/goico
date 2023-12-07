@@ -13,8 +13,8 @@ type GrpcServerInfoClient struct {
 	client     svcmeta.GrpcMetadataClient
 }
 
-func NewGrpcServerInfoClient(host string) (*GrpcServerInfoClient, error) {
-	conn, err := Dial(host)
+func NewGrpcServerInfoClient(ctx context.Context, host string) (*GrpcServerInfoClient, error) {
+	conn, err := Dial(ctx, host)
 	if err != nil {
 		return nil, err
 	}

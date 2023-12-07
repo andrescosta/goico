@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/andrescosta/goico/pkg/service/obs"
@@ -45,9 +43,14 @@ func newGrpcService(ctx context.Context, name string, desc *grpc.ServiceDesc,
 	initHandler func(context.Context) (any, error),
 	healthCheckHandler func(context.Context) error) (*GrpcService, error) {
 	svc := GrpcService{}
-	svc.Service = newService(ctx, name, "grpc")
+	t := "grpc"
+	s, err := newService(ctx, name, t)
+	if err != nil {
+		return nil, err
+	}
+	svc.Service = s
 	var sopts []grpc.ServerOption
-	sopts = append(sopts, obs.StatsForOtel())
+	sopts = append(sopts, obs.InstrumentGrpcServer())
 	server := grpc.NewServer(sopts...)
 
 	h, err := initHandler(svc.ctx)
@@ -99,7 +102,7 @@ func check(ctx context.Context, name string, healthcheck *health.Server, healthC
 }
 
 func (g *GrpcService) Info() map[string]string {
-	return map[string]string{"Name": g.name,
+	return map[string]string{"Name": g.Name,
 		"Addr":       *g.addr,
 		"Start Time": g.startTime.String(),
 		"Type":       "GRPC"}
@@ -108,9 +111,7 @@ func (g *GrpcService) Info() map[string]string {
 func (g *GrpcService) Serve() error {
 	logger := zerolog.Ctx(g.ctx)
 
-	ctx, done := signal.NotifyContext(g.ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer func() {
-		done()
 		if r := recover(); r != nil {
 			logger.Fatal().Msg("error recovering")
 		}
@@ -127,7 +128,7 @@ func (g *GrpcService) Serve() error {
 	}
 
 	go func() {
-		<-ctx.Done()
+		<-g.ctx.Done()
 		logger.Debug().Msg("GRPC Server: shutting down")
 		g.grpcServer.GracefulStop()
 	}()
@@ -137,9 +138,8 @@ func (g *GrpcService) Serve() error {
 	if err := g.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
-	logger.Debug().Msg("GRPC Server: stopped")
 
-	done()
+	logger.Debug().Msg("GRPC Server: stopped")
 	logger.Info().Msgf("Process %d ended ", os.Getpid())
 	return nil
 }

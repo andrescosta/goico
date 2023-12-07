@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/andrescosta/goico/pkg/env"
@@ -18,9 +16,14 @@ type HeadlessService struct {
 }
 
 func NewHeadlessService(ctx context.Context, name string, serve func(ctx context.Context) error) (*HeadlessService, error) {
-	svc := HeadlessService{}
-	svc.Service = newService(ctx, name, "headless")
-	svc.serve = serve
+	s, err := newService(ctx, name, "headless")
+	if err != nil {
+		return nil, err
+	}
+	svc := HeadlessService{
+		Service: s,
+		serve:   serve,
+	}
 	if env.GetAsString(name+".addr", "") != "" {
 		o, err := NewHttpServiceWithService(svc.Service, nil)
 		if err != nil {
@@ -33,14 +36,6 @@ func NewHeadlessService(ctx context.Context, name string, serve func(ctx context
 
 func (s HeadlessService) Start() error {
 	logger := zerolog.Ctx(s.ctx)
-	ctx, done := signal.NotifyContext(s.ctx, syscall.SIGINT, syscall.SIGTERM)
-	s.ctx = ctx
-	defer func() {
-		done()
-		if r := recover(); r != nil {
-			logger.Fatal().Msgf("recovered from %v", r)
-		}
-	}()
 	if s.metaService != nil {
 		logger.Info().Msgf("Starting obs process %d ", os.Getpid())
 		go func() {
@@ -52,8 +47,7 @@ func (s HeadlessService) Start() error {
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
 
 	s.Service.startTime = time.Now()
-	err := s.serve(ctx)
-	done()
+	err := s.serve(s.ctx)
 	if err != nil {
 		return err
 	}

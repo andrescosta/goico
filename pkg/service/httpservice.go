@@ -8,15 +8,12 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/service/httputils"
 	"github.com/andrescosta/goico/pkg/service/obs"
-	"github.com/andrescosta/goico/pkg/service/svcmeta"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 )
@@ -26,7 +23,6 @@ type HttpService struct {
 	server          *http.Server
 	healthCheckFunc healthCheckFunc
 	pool            *sync.Pool
-	//metadataFunc    func() map[string]string
 }
 
 type healthStatus struct {
@@ -50,7 +46,11 @@ func NewHttpServiceWithHeathCheck(ctx context.Context, name string, initHandler 
 }
 
 func newHttpService(ctx context.Context, name string, configureRoutes configureRoutesFunc, healthCheckFunc healthCheckFunc) (*HttpService, error) {
-	return newHttpServiceWithService(newService(ctx, name, "rest"), configureRoutes, healthCheckFunc)
+	s, err := newService(ctx, name, "rest")
+	if err != nil {
+		return nil, err
+	}
+	return newHttpServiceWithService(s, configureRoutes, healthCheckFunc)
 }
 
 func newHttpServiceWithService(service *Service, configureRoutes configureRoutesFunc, healthCheckFunc healthCheckFunc) (*HttpService, error) {
@@ -65,15 +65,13 @@ func newHttpServiceWithService(service *Service, configureRoutes configureRoutes
 
 	r := mux.NewRouter()
 
-	obs.Init(svc.ctx, svcmeta.Info{Name: svc.name, Version: "1"})
-
 	// setting middlewares
 	//// adds recovery middleware
 	r.Use(TryToRecover())
 	//// adds logging middleware
 	r.Use(obs.GetLoggingMiddleware)
 	////Otel
-	obs.Use(r)
+	obs.InstrumentMuxRouter(svc.Name, r)
 
 	if configureRoutes != nil {
 		err := configureRoutes(svc.ctx, r)
@@ -104,17 +102,7 @@ func newHttpServiceWithService(service *Service, configureRoutes configureRoutes
 }
 
 func (s *HttpService) Serve() error {
-	logger := zerolog.Ctx(s.ctx)
-	ctx, done := signal.NotifyContext(s.ctx, syscall.SIGINT, syscall.SIGTERM)
-	s.ctx = ctx
-	defer func() {
-		done()
-		if r := recover(); r != nil {
-			logger.Fatal().Msg("error recovering")
-		}
-	}()
 	err := s.Start()
-	done()
 	return err
 }
 
@@ -180,10 +168,10 @@ func (s *HttpService) metadataHandler(w http.ResponseWriter, r *http.Request) {
 	if s.addr == nil {
 		addr = "not configured"
 	}
-	m := map[string]string{"Name": s.name,
+	m := map[string]string{"Name": s.Name,
 		"Addr":       addr,
 		"Start Time": s.startTime.Format(time.UnixDate),
-		"Type":       s.Service.svcType}
+		"Type":       s.Service.Type}
 	b := s.pool.Get().(*bytes.Buffer)
 	b.Reset()
 	httputils.WriteJSONBody(b, m, http.StatusOK, `{error:"error getting metadata"}`, w)

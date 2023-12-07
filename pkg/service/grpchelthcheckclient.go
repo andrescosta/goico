@@ -13,8 +13,8 @@ type GrpcHelthCheckClient struct {
 	client     healthpb.HealthClient
 }
 
-func NewGrpcServerHelthCheckClient(host string) (*GrpcHelthCheckClient, error) {
-	conn, err := Dial(host)
+func NewGrpcServerHelthCheckClient(ctx context.Context, host string) (*GrpcHelthCheckClient, error) {
+	conn, err := Dial(ctx, host)
 	if err != nil {
 		return nil, err
 	}

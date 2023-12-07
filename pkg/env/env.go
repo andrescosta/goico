@@ -1,9 +1,11 @@
 package env
 
 import (
+	"log"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func GetAsString(key string, value ...string) string {
@@ -20,6 +22,33 @@ func GetOrNil(key string) *string {
 		return nil
 	}
 	return &s
+}
+
+func GetOrFatal(key string) *string {
+	s := GetOrNil(key)
+	if s == nil {
+		log.Fatalf("key %s not configured", key)
+	}
+	return s
+}
+
+func GetAsDuration(key string, value ...time.Duration) *time.Duration {
+	var def = func(v []time.Duration) *time.Duration {
+		if len(v) == 0 {
+			return nil
+		} else {
+			return &v[0]
+		}
+	}
+	s := GetOrNil(key)
+	if s == nil {
+		return def(value)
+	}
+	r, err := time.ParseDuration(*s)
+	if err != nil {
+		return def(value)
+	}
+	return &r
 }
 
 func GetAsInt[T ~int | ~int32 | ~int8 | ~int64](key string, value ...T) T {
