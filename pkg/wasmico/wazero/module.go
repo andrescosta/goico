@@ -18,8 +18,15 @@ type WasmModuleString struct {
 	initFunc   api.Function
 	mallocFunc api.Function
 	freeFunc   api.Function
+	FreeAdpter func(context.Context, uint64, uint64) ([]uint64, error)
 	module     api.Module
+	ver        uint32
 }
+
+const (
+	VerTinygo = uint32(iota)
+	VerRust
+)
 
 type EventFuncResult struct {
 	ResponseCode  uint64
@@ -42,6 +49,14 @@ func NewWasmModuleString(ctx context.Context, runtime *WasmRuntime, wasmModule [
 	if err != nil {
 		return nil, err
 	}
+	ver := VerTinygo
+	verFunc := module.ExportedFunction("ver")
+	if verFunc != nil {
+		v, err := verFunc.Call(ctx)
+		if err == nil {
+			ver = uint32(v[0])
+		}
+	}
 
 	initf := module.ExportedFunction("init")
 	wr := &WasmModuleString{
@@ -51,7 +66,9 @@ func NewWasmModuleString(ctx context.Context, runtime *WasmRuntime, wasmModule [
 		mallocFunc: module.ExportedFunction("malloc"),
 		freeFunc:   module.ExportedFunction("free"),
 		module:     module,
+		ver:        ver,
 	}
+	wr.FreeAdpter = wr.free
 
 	// Call the init function to initialize the module
 	_, err = initf.Call(ctx)
@@ -60,6 +77,14 @@ func NewWasmModuleString(ctx context.Context, runtime *WasmRuntime, wasmModule [
 	}
 
 	return wr, nil
+}
+
+func (f *WasmModuleString) free(ctx context.Context, ptr, size uint64) ([]uint64, error) {
+	if f.ver == VerTinygo {
+		return f.freeFunc.Call(ctx, ptr)
+	} else {
+		return f.freeFunc.Call(ctx, ptr, size)
+	}
 }
 
 func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, data string) (uint64, string, error) {
@@ -71,7 +96,7 @@ func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, data string) (ui
 		return 0, "", err
 	}
 	defer func() {
-		_, err := f.freeFunc.Call(ctx, uint64(funcParameterPtr))
+		_, err := f.FreeAdpter(ctx, funcParameterPtr, funcParameterSize)
 		if err != nil {
 			logger.Warn().AnErr("err", err)
 		}
@@ -82,7 +107,7 @@ func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, data string) (ui
 		return 0, "", err
 	}
 	defer func() {
-		_, err := f.freeFunc.Call(ctx, uint64(resultFuncPtr))
+		_, err := f.FreeAdpter(ctx, resultFuncPtr, resultFuncSize)
 		if err != nil {
 			logger.Warn().AnErr("err", err)
 		}
@@ -153,7 +178,7 @@ func (f *WasmModuleString) readDataFromMemory(ctx context.Context, eventResultPt
 
 	if eventResultPtr != 0 {
 		defer func() {
-			_, err := f.freeFunc.Call(ctx, uint64(eventResultPtr))
+			_, err := f.FreeAdpter(ctx, uint64(eventResultPtr), uint64(eventResultSize))
 			if err != nil {
 				logger.Err(err).Msg("error freeing memory")
 			}
