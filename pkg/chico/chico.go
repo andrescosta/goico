@@ -8,6 +8,7 @@ import (
 type Broadcaster[T any] struct {
 	listeners sync.Map
 	c         chan T
+	cancel    context.CancelFunc
 }
 
 type Listener[T any] struct {
@@ -15,15 +16,19 @@ type Listener[T any] struct {
 }
 
 func Start[T any](ctx context.Context) *Broadcaster[T] {
+
+	ctxB, cancel := context.WithCancel(ctx)
+
 	b := &Broadcaster[T]{
 		listeners: sync.Map{},
 		c:         make(chan T, 1),
+		cancel:    cancel,
 	}
 
 	go func(c *Broadcaster[T]) {
 		for {
 			select {
-			case <-ctx.Done():
+			case <-ctxB.Done():
 				return
 			case d, ok := <-c.c:
 				if ok {
@@ -43,11 +48,11 @@ func Start[T any](ctx context.Context) *Broadcaster[T] {
 }
 
 func (c *Broadcaster[T]) Stop() {
+	c.cancel()
 	c.listeners.Range(func(k any, _ any) bool {
 		c.Unsubscribe(k.(*Listener[T]))
 		return true
 	})
-
 }
 
 func (c *Broadcaster[T]) Subscribe() *Listener[T] {

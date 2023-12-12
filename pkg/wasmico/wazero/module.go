@@ -33,10 +33,11 @@ type EventFuncResult struct {
 	ResultPtrSize uint64
 }
 
-func NewWasmModuleString(ctx context.Context, runtime *WasmRuntime, wasmModule []byte, mainFuncName string) (*WasmModuleString, error) {
-
+func NewWasmModuleString(ctx context.Context, name string, runtime *WasmRuntime, wasmModule []byte, mainFuncName string) (*WasmModuleString, error) {
 	wazeroRuntime := wazero.NewRuntimeWithConfig(ctx, runtime.runtimeConfig)
 
+	// env is used by the module name used by the SDKs.
+	// TODO: change it to something more appropiate like sdk
 	_, err := wazeroRuntime.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(logForExport).Export("log").
 		Instantiate(ctx)
@@ -49,6 +50,7 @@ func NewWasmModuleString(ctx context.Context, runtime *WasmRuntime, wasmModule [
 	if err != nil {
 		return nil, err
 	}
+
 	ver := VerTinygo
 	verFunc := module.ExportedFunction("ver")
 	if verFunc != nil {
@@ -58,6 +60,7 @@ func NewWasmModuleString(ctx context.Context, runtime *WasmRuntime, wasmModule [
 		}
 	}
 
+	// TODO: Replace init with _start
 	initf := module.ExportedFunction("init")
 	wr := &WasmModuleString{
 		mainFunc: module.ExportedFunction(mainFuncName),
@@ -113,7 +116,7 @@ func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, data string) (ui
 		}
 	}()
 
-	logger.Debug().Msg("calling Event method")
+	logger.Debug().Msg("calling main method")
 	// The result of the call will be stored in struct pointed by resultFuncPtr
 	_, err = f.mainFunc.Call(ctx, resultFuncPtr, funcParameterPtr, funcParameterSize)
 	if err != nil {
