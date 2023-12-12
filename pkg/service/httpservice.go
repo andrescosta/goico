@@ -67,11 +67,12 @@ func newHttpServiceWithService(service *Service, configureRoutes configureRoutes
 
 	// setting middlewares
 	//// adds recovery middleware
-	r.Use(TryToRecover())
+	rf := RecoveryFunc{StackLevel: StackLevelFullStack}
+	r.Use(rf.TryToRecover())
 	//// adds logging middleware
 	r.Use(obs.GetLoggingMiddleware)
 	////Otel
-	obs.InstrumentMuxRouter(svc.Name, r)
+	svc.otelProvider.InstrumentMuxRouter(svc.Name, r)
 
 	if configureRoutes != nil {
 		err := configureRoutes(svc.ctx, r)
@@ -113,6 +114,7 @@ func (s *HttpService) Start() error {
 		return ErrNotAddress
 	}
 	listener, err := net.Listen("tcp", *s.Service.addr)
+	s.server.BaseContext = func(l net.Listener) context.Context { return s.ctx }
 	if err != nil {
 		return fmt.Errorf("failed to create listener on %s: %w", *s.Service.addr, err)
 	}
@@ -176,4 +178,14 @@ func (s *HttpService) metadataHandler(w http.ResponseWriter, r *http.Request) {
 	b.Reset()
 	httputils.WriteJSONBody(b, m, http.StatusOK, `{error:"error getting metadata"}`, w)
 
+}
+
+type Recovery struct {
+	logger *zerolog.Logger
+}
+
+func (r *Recovery) Println(i ...interface{}) {
+	for _, ii := range i {
+		r.logger.Error().Msgf("%v", ii)
+	}
 }

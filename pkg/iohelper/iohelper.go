@@ -117,7 +117,11 @@ func GetDirs(path string) ([]os.DirEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	return f[1:], nil
+	if len(f) == 0 {
+		return f, nil
+	} else {
+		return f[1:], nil
+	}
 }
 
 func getFiles(path string, filter func(fs.DirEntry) bool) ([]os.DirEntry, error) {

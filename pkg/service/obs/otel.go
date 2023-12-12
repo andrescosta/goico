@@ -39,7 +39,7 @@ type OtelProvider struct {
 
 func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 	if !env.GetAsBool("obs.enabled") {
-		return &OtelProvider{}, nil
+		return &OtelProvider{enabled: false}, nil
 	}
 
 	logger := zerolog.Ctx(ctx)
@@ -295,11 +295,17 @@ func newMeterProviderArr(res *resource.Resource, exps []metric.Exporter, interva
 	return meterProvider, nil
 }
 
-func InstrumentMuxRouter(name string, r *mux.Router) {
-	r.Use(otelmux.Middleware(name))
+func (o *OtelProvider) InstrumentMuxRouter(name string, r *mux.Router) {
+	if o.enabled {
+		r.Use(otelmux.Middleware(name))
+	}
 }
 
-func InstrumentGrpcServer() grpc.ServerOption {
-	x := grpc.StatsHandler(otelgrpc.NewServerHandler())
+func (o *OtelProvider) InstrumentGrpcServer() grpc.ServerOption {
+	var x grpc.ServerOption
+	x = grpc.EmptyServerOption{}
+	if o.enabled {
+		x = grpc.StatsHandler(otelgrpc.NewServerHandler())
+	}
 	return x
 }

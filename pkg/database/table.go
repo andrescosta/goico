@@ -79,6 +79,21 @@ func (s *Table[S]) Update(_ context.Context, data S) error {
 	}
 	return nil
 }
+func (s *Table[S]) Delete(_ context.Context, id string) error {
+	if err := s.db.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(s.name))
+		if b == nil {
+			return fmt.Errorf("table does not exist")
+		}
+		if err := b.Delete([]byte(id)); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
+}
 
 func (s *Table[S]) Get(_ context.Context, id string) (*S, error) {
 	var data *S = nil

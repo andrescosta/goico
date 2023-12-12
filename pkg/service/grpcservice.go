@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/andrescosta/goico/pkg/service/obs"
 	"github.com/andrescosta/goico/pkg/service/svcmeta"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -50,7 +49,7 @@ func newGrpcService(ctx context.Context, name string, desc *grpc.ServiceDesc,
 	}
 	svc.Service = s
 	var sopts []grpc.ServerOption
-	sopts = append(sopts, obs.InstrumentGrpcServer())
+	sopts = append(sopts, s.otelProvider.InstrumentGrpcServer())
 	server := grpc.NewServer(sopts...)
 
 	h, err := initHandler(svc.ctx)
