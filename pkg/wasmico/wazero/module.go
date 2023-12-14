@@ -24,6 +24,7 @@ type WasmModuleString struct {
 }
 
 const (
+	// TODO: create a type and start from 1: https://github.com/uber-go/guide/blob/master/style.md#start-enums-at-one
 	VerTinygo = uint32(iota)
 	VerRust
 )
