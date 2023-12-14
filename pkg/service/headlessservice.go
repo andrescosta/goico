@@ -24,7 +24,7 @@ func NewHeadlessService(ctx context.Context, name string, serve func(ctx context
 		Service: s,
 		serve:   serve,
 	}
-	if env.GetAsString(name+".addr", "") != "" {
+	if env.Env(name+".addr", "") != "" {
 		o, err := NewHttpServiceWithService(svc.Service, nil)
 		if err != nil {
 			return nil, err

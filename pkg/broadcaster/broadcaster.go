@@ -1,4 +1,4 @@
-package chico
+package broadcaster
 
 import (
 	"context"

@@ -38,13 +38,13 @@ type OtelProvider struct {
 }
 
 func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
-	if !env.GetAsBool("obs.enabled") {
+	if !env.EnvAsBool("obs.enabled") {
 		return &OtelProvider{enabled: false}, nil
 	}
 
 	logger := zerolog.Ctx(ctx)
 
-	interval := *env.GetAsDuration("obs.interval", 20*time.Second)
+	interval := *env.EnvAsDuration("obs.interval", 20*time.Second)
 
 	var shutdownFuncs []func(context.Context) error
 	var err error
@@ -78,7 +78,7 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 	var exporters []metric.Exporter
 
 	//// Set stdout exporter
-	if env.GetAsBool("obs.exporter.stdout") {
+	if env.EnvAsBool("obs.exporter.stdout") {
 		// trace
 		b, err := stdouttrace.New(
 			stdouttrace.WithPrettyPrint())
@@ -98,14 +98,14 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 	}
 
 	//// Set oltp grpc exporters
-	traceAddrGrpc := env.GetOrNil("obs.exporter.trace.grpc.host")
-	traceAddrHttp := env.GetOrNil("obs.exporter.trace.http.host")
-	metricAddrGrpc := env.GetOrNil("obs.exporter.metrics.grpc.host")
-	metricAddrHttp := env.GetOrNil("obs.exporter.metrics.http.host")
+	traceAddrGrpc := env.EnvOrNil("obs.exporter.trace.grpc.host")
+	traceAddrHttp := env.EnvOrNil("obs.exporter.trace.http.host")
+	metricAddrGrpc := env.EnvOrNil("obs.exporter.metrics.grpc.host")
+	metricAddrHttp := env.EnvOrNil("obs.exporter.metrics.http.host")
 	var meterProvider *metric.MeterProvider
 	var traceProvider *sdktrace.TracerProvider
 
-	if env.GetAsBool("obs.exporter.trace") || traceAddrGrpc != nil || traceAddrHttp != nil {
+	if env.EnvAsBool("obs.exporter.trace") || traceAddrGrpc != nil || traceAddrHttp != nil {
 		if traceAddrGrpc == nil && traceAddrHttp == nil { // in case trace is enabled but addrs are not configured
 			logger.Warn().Msg("trace exporter not enabled because hosts are not configured using obs.exporter.trace.grpc.host or obs.exporter.trace.http.host")
 		} else {
@@ -149,7 +149,7 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 		}
 	}
 	// metrics
-	if env.GetAsBool("obs.exporter.metrics") || metricAddrGrpc != nil || metricAddrHttp != nil {
+	if env.EnvAsBool("obs.exporter.metrics") || metricAddrGrpc != nil || metricAddrHttp != nil {
 		if metricAddrGrpc == nil && metricAddrHttp == nil { // in case metric is enabled but addrs are not configured
 			logger.Warn().Msg("meter exporter not enabled because hosts are not configured using obs.exporter.metrics.grpc.host or obs.exporter.metrics.http.host")
 		} else {
@@ -174,7 +174,7 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 			if metricAddrHttp != nil {
 				var ops []otlpmetrichttp.Option
 				ops = append(ops, otlpmetrichttp.WithInsecure(), otlpmetrichttp.WithEndpoint(*metricAddrHttp))
-				p := env.GetOrNil("obs.exporter.metrics.host.path")
+				p := env.EnvOrNil("obs.exporter.metrics.host.path")
 				if p != nil {
 					ops = append(ops, otlpmetrichttp.WithURLPath(*p))
 				}
@@ -198,7 +198,7 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 		}
 	}
 
-	if env.GetAsBool("obs.metrics.host") {
+	if env.EnvAsBool("obs.metrics.host") {
 		err = host.Start()
 		if err != nil {
 			traceProvider.Shutdown(ctx)
@@ -210,7 +210,7 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 	}
 
 	//runtime telemetry
-	if env.GetAsBool("obs.metrics.runtime") {
+	if env.EnvAsBool("obs.metrics.runtime") {
 		err = runtime.Start(runtime.WithMinimumReadMemStatsInterval(interval))
 		if err != nil {
 			traceProvider.Shutdown(ctx)

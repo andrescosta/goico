@@ -1,4 +1,4 @@
-package utilico
+package collection
 
 func FirstOrDefault[T any](ds []T, df T) T {
 	d := df

@@ -1,4 +1,4 @@
-package reflectico
+package reflectutl
 
 import (
 	"reflect"

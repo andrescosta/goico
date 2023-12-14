@@ -95,7 +95,7 @@ func newHttpServiceWithService(service *Service, configureRoutes configureRoutes
 	}
 
 	// add metadata handler if enabled
-	if env.GetAsBool("metadata.enabled", false) {
+	if env.EnvAsBool("metadata.enabled", false) {
 		r.HandleFunc("/meta", svc.metadataHandler)
 	}
 

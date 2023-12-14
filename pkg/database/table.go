@@ -20,7 +20,7 @@ type Table[S any] struct {
 	name      string
 }
 
-func GetTable[S any](ctx context.Context, db *Database, name string, marshaler Marshaler[S]) (*Table[S], error) {
+func NewTable[S any](ctx context.Context, db *Database, name string, marshaler Marshaler[S]) (*Table[S], error) {
 	table := &Table[S]{
 		marshaler: marshaler,
 		name:      name,

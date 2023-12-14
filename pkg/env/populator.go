@@ -1,4 +1,4 @@
-package config
+package env
 
 import (
 	"fmt"
@@ -19,19 +19,22 @@ const (
 
 var Environments = []string{DEVELOPMENT, PRODUCTION, TEST}
 
-// Follows this convention: https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use
-func LoadEnvVariables() error {
+// Follows this convention:
+//
+//	https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use
+func Populate() error {
 	Environment = os.Getenv("APP_ENV")
 	if strings.TrimSpace(Environment) == "" {
 		Environment = DEVELOPMENT
 	} else {
 		if !slices.Contains(Environments, Environment) {
-			return fmt.Errorf("Invalid environment %s", Environment)
+			return fmt.Errorf("invalid environment %s", Environment)
 		}
 	}
 
 	godotenv.Load(".env." + Environment + ".local")
-	if "test" != Environment {
+
+	if Environment != "test" {
 		godotenv.Load(".env.local")
 	}
 	godotenv.Load(".env." + Environment)

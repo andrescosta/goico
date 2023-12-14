@@ -20,13 +20,14 @@ type WasmModuleString struct {
 	freeFunc   api.Function
 	FreeAdpter func(context.Context, uint64, uint64) ([]uint64, error)
 	module     api.Module
-	ver        uint32
+	ver        ModuleType
 }
 
+type ModuleType uint32
+
 const (
-	// TODO: create a type and start from 1: https://github.com/uber-go/guide/blob/master/style.md#start-enums-at-one
-	VerTinygo = uint32(iota)
-	VerRust
+	TypeDefault ModuleType = iota
+	TypeRust
 )
 
 type EventFuncResult struct {
@@ -52,12 +53,12 @@ func NewWasmModuleString(ctx context.Context, name string, runtime *WasmRuntime,
 		return nil, err
 	}
 
-	ver := VerTinygo
+	ver := TypeDefault
 	verFunc := module.ExportedFunction("ver")
 	if verFunc != nil {
 		v, err := verFunc.Call(ctx)
 		if err == nil {
-			ver = uint32(v[0])
+			ver = ModuleType(v[0])
 		}
 	}
 
@@ -84,7 +85,7 @@ func NewWasmModuleString(ctx context.Context, name string, runtime *WasmRuntime,
 }
 
 func (f *WasmModuleString) free(ctx context.Context, ptr, size uint64) ([]uint64, error) {
-	if f.ver == VerTinygo {
+	if f.ver == TypeDefault {
 		return f.freeFunc.Call(ctx, ptr)
 	} else {
 		return f.freeFunc.Call(ctx, ptr, size)

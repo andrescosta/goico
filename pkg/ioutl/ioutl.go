@@ -1,4 +1,4 @@
-package iohelper
+package ioutl
 
 import (
 	"bufio"
@@ -15,12 +15,14 @@ import (
 	"time"
 )
 
-var random = rand.New(rand.NewSource(time.Now().UnixNano()))
+var (
+	random = rand.New(rand.NewSource(time.Now().UnixNano()))
+)
 
 func WriteToRandomFile(path, preffix, suffix string, data []byte) error {
-	CreateDirIfNotExist(path)
+	CreateDirsIfNotExist(path)
 	fullpath := BuildPathWithFile(path, randomFileName(preffix, suffix))
-	return WriteToFile(fullpath, data)
+	return Write(fullpath, data)
 }
 
 func FileExists(fullPath string) (bool, error) {
@@ -39,12 +41,12 @@ func CreateEmptyIfNotExists(fullpath string) error {
 		return err
 	}
 	if !e {
-		return WriteToFile(fullpath, []byte(""))
+		return Write(fullpath, []byte(""))
 	}
 	return nil
 }
 
-func WriteToFile(file string, data []byte) error {
+func Write(file string, data []byte) error {
 	f, err := os.Create(file)
 	if err != nil {
 		return errors.Join(errors.New("error creating file"), err)
@@ -65,7 +67,7 @@ func WriteToFile(file string, data []byte) error {
 	return nil
 }
 
-func GetSubDirectories(path string) ([]string, error) {
+func Subdirs(path string) ([]string, error) {
 	dires, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
@@ -77,7 +79,7 @@ func GetSubDirectories(path string) ([]string, error) {
 	return dirs, nil
 }
 
-func getFilesSorted(path string, preffix, suffix string) ([]os.DirEntry, error) {
+func filesSorted(path string, preffix, suffix string) ([]os.DirEntry, error) {
 	var files []fs.DirEntry
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -104,14 +106,14 @@ func getFilesSorted(path string, preffix, suffix string) ([]os.DirEntry, error) 
 	})
 	return files, nil
 }
-func GetFiles(path string) ([]os.DirEntry, error) {
-	return getFiles(path, func(d fs.DirEntry) bool {
+func Files(path string) ([]os.DirEntry, error) {
+	return files(path, func(d fs.DirEntry) bool {
 		return !d.IsDir()
 	})
 }
 
-func GetDirs(path string) ([]os.DirEntry, error) {
-	f, err := getFiles(path, func(d fs.DirEntry) bool {
+func Dirs(path string) ([]os.DirEntry, error) {
+	f, err := files(path, func(d fs.DirEntry) bool {
 		return d.IsDir()
 	})
 	if err != nil {
@@ -124,7 +126,7 @@ func GetDirs(path string) ([]os.DirEntry, error) {
 	}
 }
 
-func getFiles(path string, filter func(fs.DirEntry) bool) ([]os.DirEntry, error) {
+func files(path string, filter func(fs.DirEntry) bool) ([]os.DirEntry, error) {
 	var files []fs.DirEntry
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -154,8 +156,8 @@ func getFiles(path string, filter func(fs.DirEntry) bool) ([]os.DirEntry, error)
 	return files, nil
 }
 
-func getNFilesSorted(path, preffix, suffix string, n int) ([]os.DirEntry, error) {
-	files, err := getFilesSorted(path, preffix, suffix)
+func topNfilesSorted(path, preffix, suffix string, n int) ([]os.DirEntry, error) {
+	files, err := filesSorted(path, preffix, suffix)
 	if err != nil {
 		return nil, err
 	}
@@ -166,8 +168,8 @@ func getNFilesSorted(path, preffix, suffix string, n int) ([]os.DirEntry, error)
 	}
 }
 
-func GetOldestFile(path, preffix, suffix string) ([]byte, *string, error) {
-	files, err := getNFilesSorted(path, preffix, suffix, 1)
+func OldestFile(path, preffix, suffix string) ([]byte, *string, error) {
+	files, err := topNfilesSorted(path, preffix, suffix, 1)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -175,22 +177,22 @@ func GetOldestFile(path, preffix, suffix string) ([]byte, *string, error) {
 		return nil, nil, nil
 	}
 	filename := BuildFullPathWithFile([]string{path}, files[0].Name())
-	data, err := ReadFile(filename)
+	data, err := Read(filename)
 	if err != nil {
 		return nil, nil, err
 	}
 	return data, &filename, nil
 }
 
-func ReadFile(file string) ([]byte, error) {
+func Read(file string) ([]byte, error) {
 	return os.ReadFile(file)
 }
 
-func RemoveFile(file string) error {
+func Remove(file string) error {
 	return os.Remove(file)
 }
 
-func RenameFile(file, newFile string) error {
+func Rename(file, newFile string) error {
 	return os.Rename(file, newFile)
 }
 
@@ -199,7 +201,7 @@ func randomFileName(preffix, suffix string) string {
 	return preffix + s + suffix
 }
 
-func CreateDirIfNotExist(directory string) error {
+func CreateDirsIfNotExist(directory string) error {
 	return os.MkdirAll(directory, os.ModeExclusive)
 }
 
@@ -215,7 +217,7 @@ func BuildPathWithFile(path, file string) string {
 	return filepath.Join(path, file)
 }
 
-func GetLastnLines(file string, nlines int, skipEmpty bool, noincludecrlf bool) ([]string, error) {
+func LastLines(file string, nlines int, skipEmpty bool, noincludecrlf bool) ([]string, error) {
 	bufferSize := int64(4096)
 	fileHandle, err := os.Open(file)
 	if err != nil {

@@ -12,14 +12,15 @@ import (
 	"github.com/rs/zerolog"
 )
 
+type StackLevel int
+
 const (
-	// TODO: create a type and start from 1: https://github.com/uber-go/guide/blob/master/style.md#start-enums-at-one
-	StackLevelSimple int = iota
+	StackLevelSimple StackLevel = iota + 1
 	StackLevelFullStack
 )
 
 type RecoveryFunc struct {
-	StackLevel int
+	StackLevel StackLevel
 }
 
 func (s *RecoveryFunc) TryToRecover() mux.MiddlewareFunc {

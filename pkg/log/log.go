@@ -13,47 +13,50 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-type Config struct {
-	Console
-	File
-	Level  zerolog.Level
-	Caller bool
-}
+type (
+	Config struct {
+		Console
+		File
+		Level  zerolog.Level
+		Caller bool
+	}
 
-type Console struct {
-	Enabled          bool
-	ExcludeTimestamp bool
-}
+	Console struct {
+		Enabled          bool
+		ExcludeTimestamp bool
+	}
 
-type File struct {
-	Enabled          bool
-	EncodeLogsAsJson bool
-	Directory        string
-	Name             string
-	MaxSize          int
-	MaxBackups       int
-	MaxAge           int
-}
+	File struct {
+		Enabled          bool
+		EncodeLogsAsJson bool
+		Directory        string
+		Name             string
+		MaxSize          int
+		MaxBackups       int
+		MaxAge           int
+	}
+)
 
 func NewUsingEnv() *zerolog.Logger {
-	return NewUsingEnvAndValues(nil)
+	var empty map[string]string
+	return NewUsingEnvAndValues(empty)
 }
 func NewUsingEnvAndValues(values map[string]string) *zerolog.Logger {
 	config := Config{
 		Console: Console{
-			Enabled:          env.GetAsBool("log.console.enabled", true),
-			ExcludeTimestamp: env.GetAsBool("log.console.exclude.timestamp", false),
+			Enabled:          env.EnvAsBool("log.console.enabled", true),
+			ExcludeTimestamp: env.EnvAsBool("log.console.exclude.timestamp", false),
 		},
-		Level:  env.GetAsInt("log.level", zerolog.InfoLevel),
-		Caller: env.GetAsBool("log.caller", false),
+		Level:  env.EnvAsInt("log.level", zerolog.InfoLevel),
+		Caller: env.EnvAsBool("log.caller", false),
 		File: File{
-			Enabled:          env.GetAsBool("log.file.enabled", false),
-			EncodeLogsAsJson: env.GetAsBool("log.file.json", false),
-			Directory:        env.GetAsString("log.file.dir", ".\\log"),
-			Name:             env.GetAsString("log.file.name", "file.log"),
-			MaxSize:          env.GetAsInt("log.file.max.size", 100),
-			MaxBackups:       env.GetAsInt("log.file.max.backups", 10),
-			MaxAge:           env.GetAsInt("log.file.max.age", 24),
+			Enabled:          env.EnvAsBool("log.file.enabled", false),
+			EncodeLogsAsJson: env.EnvAsBool("log.file.json", false),
+			Directory:        env.Env("log.file.dir", ".\\log"),
+			Name:             env.Env("log.file.name", "file.log"),
+			MaxSize:          env.EnvAsInt("log.file.max.size", 100),
+			MaxBackups:       env.EnvAsInt("log.file.max.backups", 10),
+			MaxAge:           env.EnvAsInt("log.file.max.age", 24),
 		},
 	}
 	return New(values, config)

@@ -1,4 +1,4 @@
-package templico
+package helpinfo
 
 import (
 	"io"
@@ -8,10 +8,10 @@ import (
 	"unicode/utf8"
 )
 
-func Render(w io.Writer, text string, data any) {
+func Render(w io.Writer, info string, data any) {
 	t := template.New("top")
 	t.Funcs(template.FuncMap{"trim": strings.TrimSpace, "capitalize": capitalize})
-	template.Must(t.Parse(text))
+	template.Must(t.Parse(info))
 	if err := t.Execute(w, data); err != nil {
 		panic(err)
 	}

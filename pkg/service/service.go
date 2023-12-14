@@ -7,12 +7,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andrescosta/goico/pkg/config"
+	"github.com/andrescosta/goico/pkg/collection"
 	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/log"
 	"github.com/andrescosta/goico/pkg/service/obs"
 	"github.com/andrescosta/goico/pkg/service/svcmeta"
-	"github.com/andrescosta/goico/pkg/utilico"
 	"github.com/rs/zerolog"
 )
 
@@ -33,7 +32,7 @@ var (
 
 func newService(ctx context.Context, name string, svcType string) (*Service, error) {
 	// Enviroment variables configuration
-	if err := config.LoadEnvVariables(); err != nil {
+	if err := env.Populate(); err != nil {
 		return nil, errors.Join(err, ErrEnvLoading)
 	}
 	ctx, done := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
@@ -43,7 +42,7 @@ func newService(ctx context.Context, name string, svcType string) (*Service, err
 	ctx = logger.WithContext(ctx)
 
 	envaddr := name + ".addr"
-	addr := env.GetOrNil(envaddr)
+	addr := env.EnvOrNil(envaddr)
 	metainfo := svcmeta.Info{Name: name, Version: "1", Type: svcType}
 	o, err := obs.New(ctx, metainfo)
 	if err != nil {
@@ -73,7 +72,7 @@ func (s *Service) waitForDoneAndEndTheWorld() {
 	defer done()
 	err := s.otelProvider.Shutdown(shutdownCtx)
 	if err != nil {
-		e := utilico.UnwrapError(err)
+		e := collection.UnwrapError(err)
 		logger.Warn().Errs(zerolog.ErrorFieldName, e).Msg("error shuting down")
 	} else {
 		logger.Debug().Msg("Service: stopped without errors")
