@@ -15,6 +15,6 @@ func WriteJSONBody(b *bytes.Buffer, body any, status int, altError string, w htt
 		return
 	}
 	w.WriteHeader(status)
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/JSON")
 	_, _ = b.WriteTo(w)
 }

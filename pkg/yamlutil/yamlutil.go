@@ -1,4 +1,4 @@
-package yamlutl
+package yamlutil
 
 import (
 	"os"
@@ -22,9 +22,7 @@ func Marshal[T any](t *T) (*string, error) {
 	o, err := yaml.Marshal(t)
 	if err != nil {
 		return nil, err
-	} else {
-		s := string(o)
-		return &s, err
 	}
-
+	s := string(o)
+	return &s, err
 }

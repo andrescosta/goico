@@ -8,13 +8,14 @@ import (
 	"unicode/utf8"
 )
 
-func Render(w io.Writer, info string, data any) {
+func Render(w io.Writer, info string, data any) error {
 	t := template.New("top")
 	t.Funcs(template.FuncMap{"trim": strings.TrimSpace, "capitalize": capitalize})
 	template.Must(t.Parse(info))
 	if err := t.Execute(w, data); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func capitalize(s string) string {

@@ -9,35 +9,51 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var Environment string = DEVELOPMENT
+var Environment = Development
 
 const (
-	DEVELOPMENT = "development"
-	PRODUCTION  = "production"
-	TEST        = "test"
+	Development = "development"
+
+	Production = "production"
+
+	Test = "test"
 )
 
-var Environments = []string{DEVELOPMENT, PRODUCTION, TEST}
+var Environments = []string{Development, Production, Test}
 
 // Follows this convention:
+
 //
+
 //	https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use
+
 func Populate() error {
 	Environment = os.Getenv("APP_ENV")
+
 	if strings.TrimSpace(Environment) == "" {
-		Environment = DEVELOPMENT
+		Environment = Development
 	} else {
 		if !slices.Contains(Environments, Environment) {
 			return fmt.Errorf("invalid environment %s", Environment)
 		}
 	}
-
-	godotenv.Load(".env." + Environment + ".local")
+	if err := godotenv.Load(".env." + Environment + ".local"); err != nil {
+		return err
+	}
 
 	if Environment != "test" {
-		godotenv.Load(".env.local")
+		if err := godotenv.Load(".env.local"); err != nil {
+			return err
+		}
 	}
-	godotenv.Load(".env." + Environment)
-	godotenv.Load()
+
+	if err := godotenv.Load(".env." + Environment); err != nil {
+		return err
+	}
+
+	if err := godotenv.Load(); err != nil {
+		return err
+	}
+
 	return nil
 }

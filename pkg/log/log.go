@@ -8,27 +8,24 @@ import (
 	"time"
 
 	"github.com/andrescosta/goico/pkg/env"
-
 	"github.com/rs/zerolog"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 type (
-	Config struct {
-		Console
-		File
+	config struct {
+		console
+		file
 		Level  zerolog.Level
 		Caller bool
 	}
-
-	Console struct {
+	console struct {
 		Enabled          bool
 		ExcludeTimestamp bool
 	}
-
-	File struct {
+	file struct {
 		Enabled          bool
-		EncodeLogsAsJson bool
+		EncodeLogsAsJSON bool
 		Directory        string
 		Name             string
 		MaxSize          int
@@ -37,65 +34,58 @@ type (
 	}
 )
 
-func NewUsingEnv() *zerolog.Logger {
+func New() *zerolog.Logger {
 	var empty map[string]string
-	return NewUsingEnvAndValues(empty)
+	return NewWithContext(empty)
 }
-func NewUsingEnvAndValues(values map[string]string) *zerolog.Logger {
-	config := Config{
-		Console: Console{
-			Enabled:          env.EnvAsBool("log.console.enabled", true),
-			ExcludeTimestamp: env.EnvAsBool("log.console.exclude.timestamp", false),
+func NewWithContext(ctxInfo map[string]string) *zerolog.Logger {
+	cfg := config{
+		console: console{
+			Enabled:          env.AsBool("log.console.enabled", true),
+			ExcludeTimestamp: env.AsBool("log.console.exclude.timestamp", false),
 		},
-		Level:  env.EnvAsInt("log.level", zerolog.InfoLevel),
-		Caller: env.EnvAsBool("log.caller", false),
-		File: File{
-			Enabled:          env.EnvAsBool("log.file.enabled", false),
-			EncodeLogsAsJson: env.EnvAsBool("log.file.json", false),
+		Level:  env.AsInt("log.level", zerolog.InfoLevel),
+		Caller: env.AsBool("log.caller", false),
+		file: file{
+			Enabled:          env.AsBool("log.file.enabled", false),
+			EncodeLogsAsJSON: env.AsBool("log.file.JSON", false),
 			Directory:        env.Env("log.file.dir", ".\\log"),
 			Name:             env.Env("log.file.name", "file.log"),
-			MaxSize:          env.EnvAsInt("log.file.max.size", 100),
-			MaxBackups:       env.EnvAsInt("log.file.max.backups", 10),
-			MaxAge:           env.EnvAsInt("log.file.max.age", 24),
+			MaxSize:          env.AsInt("log.file.max.size", 100),
+			MaxBackups:       env.AsInt("log.file.max.backups", 10),
+			MaxAge:           env.AsInt("log.file.max.age", 24),
 		},
 	}
-	return New(values, config)
+	return newLogger(ctxInfo, cfg)
 }
 
-func New(values map[string]string, config Config) *zerolog.Logger {
+func newLogger(ctxInfo map[string]string, cfg config) *zerolog.Logger {
 	var writers []io.Writer
-
-	if config.Console.Enabled {
-		writers = append(writers, configureLogToConsole(config.Console))
+	if cfg.console.Enabled {
+		writers = append(writers, configureLogToConsole(cfg.console))
 	}
-	if config.File.Enabled && strings.TrimSpace(config.File.Name) != "" {
-		writers = append(writers, configureLogToFile(config.File))
+	if cfg.file.Enabled && strings.TrimSpace(cfg.file.Name) != "" {
+		writers = append(writers, configureLogToFile(cfg.file))
 	}
 	mw := io.MultiWriter(writers...)
-
-	zerolog.SetGlobalLevel(config.Level)
-
+	zerolog.SetGlobalLevel(cfg.Level)
 	ctx := zerolog.New(mw).With().Timestamp()
-
-	if config.Caller {
+	if cfg.Caller {
 		ctx = ctx.Caller()
 	}
-
-	for k, v := range values {
+	for k, v := range ctxInfo {
 		ctx = ctx.Str(k, v)
 	}
-
 	logger := ctx.Logger()
-
 	return &logger
 }
 
-func configureLogToConsole(config Console) (writer io.Writer) {
+func configureLogToConsole(cfg console) (writer io.Writer) {
 	writer = zerolog.NewConsoleWriter(
 		func(w *zerolog.ConsoleWriter) {
 			w.Out = os.Stdout
 			w.TimeFormat = time.RFC3339
-			if config.ExcludeTimestamp {
+			if cfg.ExcludeTimestamp {
 				w.PartsExclude = []string{zerolog.TimestampFieldName}
 			}
 		},
@@ -103,16 +93,16 @@ func configureLogToConsole(config Console) (writer io.Writer) {
 	return
 }
 
-func configureLogToFile(config File) (writer io.Writer) {
-	return configureLumberjack(config)
+func configureLogToFile(cfg file) (writer io.Writer) {
+	return configureLumberjack(cfg)
 }
 
-func configureLumberjack(config File) (writer io.Writer) {
+func configureLumberjack(cfg file) (writer io.Writer) {
 	writer = &lumberjack.Logger{
-		Filename:   path.Join(config.Directory, config.Name),
-		MaxBackups: config.MaxBackups,
-		MaxSize:    config.MaxSize,
-		MaxAge:     config.MaxAge,
+		Filename:   path.Join(cfg.Directory, cfg.Name),
+		MaxBackups: cfg.MaxBackups,
+		MaxSize:    cfg.MaxSize,
+		MaxAge:     cfg.MaxAge,
 	}
 	return
 }

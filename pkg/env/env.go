@@ -15,7 +15,7 @@ func Env(key string, defs ...string) string {
 	return s
 }
 
-func EnvOrNil(key string) *string {
+func OrNil(key string) *string {
 	s, ok := os.LookupEnv(key)
 	if !ok {
 		return nil
@@ -23,15 +23,14 @@ func EnvOrNil(key string) *string {
 	return &s
 }
 
-func EnvAsDuration(key string, values ...time.Duration) *time.Duration {
+func AsDuration(key string, values ...time.Duration) *time.Duration {
 	var def = func(v []time.Duration) *time.Duration {
 		if len(v) == 0 {
 			return nil
-		} else {
-			return &v[0]
 		}
+		return &v[0]
 	}
-	s := EnvOrNil(key)
+	s := OrNil(key)
 	if s == nil {
 		return def(values)
 	}
@@ -42,7 +41,7 @@ func EnvAsDuration(key string, values ...time.Duration) *time.Duration {
 	return &r
 }
 
-func EnvAsInt[T ~int | ~int32 | ~int8 | ~int64](key string, value ...T) T {
+func AsInt[T ~int | ~int32 | ~int8 | ~int64](key string, value ...T) T {
 	s, ok := os.LookupEnv(key)
 	if !ok {
 		return getDefault(value, 0)
@@ -54,7 +53,7 @@ func EnvAsInt[T ~int | ~int32 | ~int8 | ~int64](key string, value ...T) T {
 	return T(v)
 }
 
-func EnvAsBool(key string, value ...bool) bool {
+func AsBool(key string, value ...bool) bool {
 	s, ok := os.LookupEnv(key)
 	if !ok {
 		return getDefault(value, false)
@@ -66,7 +65,7 @@ func EnvAsBool(key string, value ...bool) bool {
 	return v
 }
 
-func EnvAsArray(key string, def string) []string {
+func AsArray(key string, def string) []string {
 	v := Env(key, def)
 	return strings.Split(v, ",")
 }
@@ -74,7 +73,6 @@ func EnvAsArray(key string, def string) []string {
 func getDefault[T any](values []T, default1 T) T {
 	if len(values) == 0 {
 		return default1
-	} else {
-		return values[0]
 	}
+	return values[0]
 }

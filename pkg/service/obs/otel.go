@@ -38,17 +38,13 @@ type OtelProvider struct {
 }
 
 func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
-	if !env.EnvAsBool("obs.enabled") {
+	if !env.AsBool("obs.enabled") {
 		return &OtelProvider{enabled: false}, nil
 	}
-
 	logger := zerolog.Ctx(ctx)
-
-	interval := *env.EnvAsDuration("obs.interval", 20*time.Second)
-
+	interval := *env.AsDuration("obs.interval", 20*time.Second)
 	var shutdownFuncs []func(context.Context) error
 	var err error
-
 	// sutdown funcs
 	shutdown := func(ctx context.Context) error {
 		var err error
@@ -58,27 +54,22 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 		shutdownFuncs = nil
 		return err
 	}
-
 	// error handler
 	handleErr := func(inErr error) {
 		err = errors.Join(inErr, shutdown(ctx))
 	}
-
 	// otel resource
 	res, err := newResource(ctx, info.Name, info.Version)
 	if err != nil {
 		return nil, err
 	}
-
 	// Configuring Otel Signals:  Metrics(meters), traces, baggage (logs not implemented by otel)
 	otel.SetTextMapPropagator(newPropagator())
-
 	// Set exporters
 	var batches []sdktrace.SpanExporter
 	var exporters []metric.Exporter
-
 	//// Set stdout exporter
-	if env.EnvAsBool("obs.exporter.stdout") {
+	if env.AsBool("obs.exporter.stdout") {
 		// trace
 		b, err := stdouttrace.New(
 			stdouttrace.WithPrettyPrint())
@@ -87,7 +78,6 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 			return nil, err
 		}
 		batches = append(batches, b)
-
 		// metrics
 		e, err := stdoutmetric.New()
 		if err != nil {
@@ -96,17 +86,15 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 		}
 		exporters = append(exporters, e)
 	}
-
 	//// Set oltp grpc exporters
-	traceAddrGrpc := env.EnvOrNil("obs.exporter.trace.grpc.host")
-	traceAddrHttp := env.EnvOrNil("obs.exporter.trace.http.host")
-	metricAddrGrpc := env.EnvOrNil("obs.exporter.metrics.grpc.host")
-	metricAddrHttp := env.EnvOrNil("obs.exporter.metrics.http.host")
+	traceAddrGrpc := env.OrNil("obs.exporter.trace.grpc.host")
+	traceAddrHTTP := env.OrNil("obs.exporter.trace.http.host")
+	metricAddrGrpc := env.OrNil("obs.exporter.metrics.grpc.host")
+	metricAddrHTTP := env.OrNil("obs.exporter.metrics.http.host")
 	var meterProvider *metric.MeterProvider
 	var traceProvider *sdktrace.TracerProvider
-
-	if env.EnvAsBool("obs.exporter.trace") || traceAddrGrpc != nil || traceAddrHttp != nil {
-		if traceAddrGrpc == nil && traceAddrHttp == nil { // in case trace is enabled but addrs are not configured
+	if env.AsBool("obs.exporter.trace") || traceAddrGrpc != nil || traceAddrHTTP != nil {
+		if traceAddrGrpc == nil && traceAddrHTTP == nil { // in case trace is enabled but addrs are not configured
 			logger.Warn().Msg("trace exporter not enabled because hosts are not configured using obs.exporter.trace.grpc.host or obs.exporter.trace.http.host")
 		} else {
 			if traceAddrGrpc != nil {
@@ -120,7 +108,6 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 					handleErr(err)
 					return nil, fmt.Errorf("failed to create trace exporter: %w", err)
 				}
-
 				// trace
 				e, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
 				if err != nil {
@@ -129,15 +116,14 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 				}
 				batches = append(batches, e)
 			}
-			if traceAddrHttp != nil {
-				e, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpoint(*traceAddrHttp))
+			if traceAddrHTTP != nil {
+				e, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpoint(*traceAddrHTTP))
 				if err != nil {
 					handleErr(err)
 					return nil, err
 				}
 				batches = append(batches, e)
 			}
-
 			// TODO: In a production application, use sdktrace.ProbabilitySampler with a desired probability.
 			traceProvider, err = newTraceProviderArr(batches, sdktrace.AlwaysSample(), res, interval)
 			if err != nil {
@@ -145,12 +131,11 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 				return nil, err
 			}
 			otel.SetTracerProvider(traceProvider)
-
 		}
 	}
 	// metrics
-	if env.EnvAsBool("obs.exporter.metrics") || metricAddrGrpc != nil || metricAddrHttp != nil {
-		if metricAddrGrpc == nil && metricAddrHttp == nil { // in case metric is enabled but addrs are not configured
+	if env.AsBool("obs.exporter.metrics") || metricAddrGrpc != nil || metricAddrHTTP != nil {
+		if metricAddrGrpc == nil && metricAddrHTTP == nil { // in case metric is enabled but addrs are not configured
 			logger.Warn().Msg("meter exporter not enabled because hosts are not configured using obs.exporter.metrics.grpc.host or obs.exporter.metrics.http.host")
 		} else {
 			if metricAddrGrpc != nil {
@@ -171,10 +156,10 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 				}
 				exporters = append(exporters, m)
 			}
-			if metricAddrHttp != nil {
+			if metricAddrHTTP != nil {
 				var ops []otlpmetrichttp.Option
-				ops = append(ops, otlpmetrichttp.WithInsecure(), otlpmetrichttp.WithEndpoint(*metricAddrHttp))
-				p := env.EnvOrNil("obs.exporter.metrics.host.path")
+				ops = append(ops, otlpmetrichttp.WithInsecure(), otlpmetrichttp.WithEndpoint(*metricAddrHTTP))
+				p := env.OrNil("obs.exporter.metrics.host.path")
 				if p != nil {
 					ops = append(ops, otlpmetrichttp.WithURLPath(*p))
 				}
@@ -185,37 +170,44 @@ func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
 				}
 				exporters = append(exporters, m)
 			}
-
 			meterProvider, err = newMeterProviderArr(res, exporters, interval)
 			if err != nil {
 				if traceProvider != nil {
-					traceProvider.Shutdown(ctx)
+					if err := traceProvider.Shutdown(ctx); err != nil {
+						logger.Warn().AnErr("error", err).Msg("Otel New: error shutting down")
+					}
 				}
 				return nil, err
 			}
 			otel.SetMeterProvider(meterProvider)
-
 		}
 	}
-
-	if env.EnvAsBool("obs.metrics.host") {
+	if env.AsBool("obs.metrics.host") {
 		err = host.Start()
 		if err != nil {
-			traceProvider.Shutdown(ctx)
+			if err := traceProvider.Shutdown(ctx); err != nil {
+				logger.Warn().AnErr("error", err).Msg("Otel New: error shutting down")
+			}
 			if meterProvider != nil {
-				meterProvider.Shutdown(ctx)
+				if err := meterProvider.Shutdown(ctx); err != nil {
+					logger.Warn().AnErr("error", err).Msg("Otel New: error shutting down")
+				}
 			}
 			return nil, err
 		}
 	}
 
 	//runtime telemetry
-	if env.EnvAsBool("obs.metrics.runtime") {
+	if env.AsBool("obs.metrics.runtime") {
 		err = runtime.Start(runtime.WithMinimumReadMemStatsInterval(interval))
 		if err != nil {
-			traceProvider.Shutdown(ctx)
+			if err := traceProvider.Shutdown(ctx); err != nil {
+				logger.Warn().AnErr("error", err).Msg("Otel New: error shutting down")
+			}
 			if meterProvider != nil {
-				meterProvider.Shutdown(ctx)
+				if err := meterProvider.Shutdown(ctx); err != nil {
+					logger.Warn().AnErr("error", err).Msg("Otel New: error shutting down")
+				}
 			}
 			return nil, err
 		}
@@ -260,7 +252,6 @@ func newResource(ctx context.Context, serviceName, serviceVersion string) (*reso
 	}
 	zerolog.Ctx(ctx).Debug().Msgf("Obs resource name: %s", res.String())
 	return res, nil
-
 }
 
 func newPropagator() propagation.TextMapPropagator {
@@ -271,31 +262,28 @@ func newPropagator() propagation.TextMapPropagator {
 }
 
 func newTraceProviderArr(exps []sdktrace.SpanExporter, s sdktrace.Sampler, res *resource.Resource, interval time.Duration) (*sdktrace.TracerProvider, error) {
-	var opts []sdktrace.TracerProviderOption
+	opts := make([]sdktrace.TracerProviderOption, 0)
 	opts = append(opts, sdktrace.WithSampler(s))
 	opts = append(opts, sdktrace.WithResource(res))
 	for _, e := range exps {
 		opts = append(opts, sdktrace.WithBatcher(e, sdktrace.WithBatchTimeout(interval)))
 	}
-
 	traceProvider := sdktrace.NewTracerProvider(opts...)
 	return traceProvider, nil
 }
 
 func newMeterProviderArr(res *resource.Resource, exps []metric.Exporter, interval time.Duration) (*metric.MeterProvider, error) {
-	var opts []metric.Option
+	opts := make([]metric.Option, 0)
 	opts = append(opts, metric.WithResource(res))
-
 	for _, e := range exps {
 		opts = append(opts, metric.WithReader(
 			metric.NewPeriodicReader(e, metric.WithInterval(interval))))
 	}
-
 	meterProvider := metric.NewMeterProvider(opts...)
 	return meterProvider, nil
 }
 
-func (o *OtelProvider) InstrumentMuxRouter(name string, r *mux.Router) {
+func (o *OtelProvider) InstrRouter(name string, r *mux.Router) {
 	if o.enabled {
 		r.Use(otelmux.Middleware(name))
 	}

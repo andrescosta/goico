@@ -3,7 +3,7 @@ package svcmeta
 type Info struct {
 	Name    string
 	Version string
-	Type    string
-	BuildId *string
+	Kind    string
+	BuildID *string
 	Env     map[string]string
 }
