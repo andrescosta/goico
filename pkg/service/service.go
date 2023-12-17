@@ -15,7 +15,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type ServiceSetter func(*Service)
+type Setter func(*Service)
 
 // A Service is a process that runs in the background.
 type Service struct {
@@ -34,7 +34,7 @@ var (
 	ErrEnvLoading = errors.New("env.Populate: error initializing otel stack")
 )
 
-func New(opts ...ServiceSetter) (*Service, error) {
+func New(opts ...Setter) (*Service, error) {
 	// Instantiate with default values
 	svc := &Service{
 		Name:         "",
@@ -119,36 +119,36 @@ func (s *Service) waitForDoneAndEndTheWorld() {
 }
 
 // Setters
-func WithMetaInfo(meta *meta.Data) ServiceSetter {
+func WithMetaInfo(meta *meta.Data) Setter {
 	return func(s *Service) {
 		s.meta = meta
 	}
 }
-func WithName(name string) ServiceSetter {
+func WithName(name string) Setter {
 	return func(s *Service) {
 		s.Name = name
 	}
 }
 
-func WithKind(kind string) ServiceSetter {
+func WithKind(kind string) Setter {
 	return func(s *Service) {
 		s.Kind = kind
 	}
 }
 
-func WithAddr(addr *string) ServiceSetter {
+func WithAddr(addr *string) Setter {
 	return func(s *Service) {
 		s.Addr = addr
 	}
 }
 
-func WithOtelProvider(p *obs.OtelProvider) ServiceSetter {
+func WithOtelProvider(p *obs.OtelProvider) Setter {
 	return func(s *Service) {
 		s.OtelProvider = p
 	}
 }
 
-func WithContext(ctx context.Context) ServiceSetter {
+func WithContext(ctx context.Context) Setter {
 	return func(s *Service) {
 		s.Ctx = ctx
 	}
