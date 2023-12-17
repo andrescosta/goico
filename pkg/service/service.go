@@ -10,8 +10,8 @@ import (
 	"github.com/andrescosta/goico/pkg/collection"
 	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/log"
+	"github.com/andrescosta/goico/pkg/service/meta"
 	"github.com/andrescosta/goico/pkg/service/obs"
-	"github.com/andrescosta/goico/pkg/service/svcmeta"
 	"github.com/rs/zerolog"
 )
 
@@ -21,7 +21,7 @@ type ServiceSetter func(*Service)
 type Service struct {
 	Name         string
 	Kind         string
-	meta         *svcmeta.Info
+	meta         *meta.Data
 	Addr         *string
 	startTime    time.Time
 	OtelProvider *obs.OtelProvider
@@ -62,11 +62,13 @@ func New(opts ...ServiceSetter) (*Service, error) {
 	logger := log.NewWithContext(map[string]string{"service": svc.Name})
 	svc.Ctx = logger.WithContext(svc.Ctx)
 
-	addrEnv := svc.Name + ".addr"
-	svc.Addr = env.OrNil(addrEnv)
+	if svc.Addr == nil {
+		addrEnv := svc.Name + ".addr"
+		svc.Addr = env.OrNil(addrEnv)
+	}
 
-	// meta info
-	metainfo := svcmeta.Info{Name: svc.Name, Version: "1", Kind: svc.Kind}
+	// metadata info
+	metainfo := meta.Data{Name: svc.Name, Version: "1", Kind: svc.Kind}
 
 	// observability provider controlled by envs obs.*
 	o, err := obs.New(svc.Ctx, metainfo)
@@ -117,7 +119,7 @@ func (s *Service) waitForDoneAndEndTheWorld() {
 }
 
 // Setters
-func WithMetaInfo(meta *svcmeta.Info) ServiceSetter {
+func WithMetaInfo(meta *meta.Data) ServiceSetter {
 	return func(s *Service) {
 		s.meta = meta
 	}

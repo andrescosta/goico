@@ -1,6 +1,0 @@
-pkg\collection\funcs.go:13:11: type assertion on error will fail on wrapped errors. Use errors.As to check for specific errors (errorlint)
-	e, ok := err.(interface {
-	         ^
-pkg\wasm\wasi\runtime.go:30:21: type assertion on error will fail on wrapped errors. Use errors.As to check for specific errors (errorlint)
-		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
-		                  ^

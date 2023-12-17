@@ -1,4 +1,4 @@
-package helpinfo
+package templatehelper
 
 import (
 	"io"

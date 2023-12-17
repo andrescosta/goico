@@ -1,6 +1,6 @@
-package svcmeta
+package meta
 
-type Info struct {
+type Data struct {
 	Name    string
 	Version string
 	Kind    string

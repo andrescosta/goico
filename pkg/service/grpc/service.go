@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/andrescosta/goico/pkg/service"
-	"github.com/andrescosta/goico/pkg/service/svcmeta"
+	"github.com/andrescosta/goico/pkg/service/grpc/svcmeta"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -28,42 +28,20 @@ type grpcOptions struct {
 	healthCheckHandler func(context.Context) error
 }
 
-func WithAddr(a string) func(*grpcOptions) {
-	return func(r *grpcOptions) {
-		r.addr = a
-	}
-}
-func WithHealthCheckHandler(h func(context.Context) error) func(*grpcOptions) {
-	return func(r *grpcOptions) {
-		r.healthCheckHandler = h
-	}
-}
-func WithName(n string) func(*grpcOptions) {
-	return func(r *grpcOptions) {
-		r.name = n
-	}
+type Service struct {
+	service          *service.Service
+	grpcServer       *grpc.Server
+	closeableHandler Closeable
 }
 
-func WithContext(ctx context.Context) func(*grpcOptions) {
-	return func(r *grpcOptions) {
-		r.ctx = ctx
-	}
-}
-
-func WithInitHandler(initHandler initHandler) func(*grpcOptions) {
-	return func(r *grpcOptions) {
-		r.initHandler = initHandler
-	}
-}
-
-func WithServiceDesc(serviceDesc *grpc.ServiceDesc) func(*grpcOptions) {
-	return func(r *grpcOptions) {
-		r.serviceDesc = serviceDesc
-	}
+type Closeable interface {
+	Close() error
 }
 
 func New(opts ...func(*grpcOptions)) (*Service, error) {
-	opt := &grpcOptions{}
+	opt := &grpcOptions{
+		ctx: context.Background(),
+	}
 
 	for _, o := range opts {
 		o(opt)
@@ -95,47 +73,13 @@ func New(opts ...func(*grpcOptions)) (*Service, error) {
 	reflection.Register(server)
 	healthcheck := health.NewServer()
 	healthpb.RegisterHealthServer(server, healthcheck)
-	svcmeta.RegisterGrpcMetadataServer(server, NewServerInfo(g))
+	svcmeta.RegisterGrpcMetadataServer(server, svcmeta.NewServerInfo(g.Metadata()))
 	g.grpcServer = server
 	healthcheck.SetServingStatus(g.service.Name, healthpb.HealthCheckResponse_SERVING)
 	if opt.healthCheckHandler != nil {
-		go check(g.service.Ctx, g.service.Name, healthcheck, opt.healthCheckHandler)
+		go healthcheckIt(g.service.Ctx, g.service.Name, healthcheck, opt.healthCheckHandler)
 	}
 	return g, nil
-}
-
-type Service struct {
-	service          *service.Service
-	grpcServer       *grpc.Server
-	closeableHandler Closeable
-}
-type Closeable interface {
-	Close() error
-}
-
-func check(ctx context.Context, name string, healthcheck *health.Server, healthCheckHandler func(context.Context) error) {
-	next := healthpb.HealthCheckResponse_SERVING
-	for {
-		timer := time.NewTicker(5 * time.Second)
-		select {
-		case <-ctx.Done():
-			healthcheck.Shutdown()
-			return
-		case <-timer.C:
-			if err := healthCheckHandler(ctx); err != nil {
-				healthcheck.SetServingStatus(name, healthpb.HealthCheckResponse_NOT_SERVING)
-				next = healthpb.HealthCheckResponse_NOT_SERVING
-			} else {
-				if next == healthpb.HealthCheckResponse_NOT_SERVING {
-					healthcheck.SetServingStatus(name, healthpb.HealthCheckResponse_SERVING)
-				}
-			}
-		}
-	}
-}
-
-func (g *Service) Info() map[string]string {
-	return g.service.Metadata()
 }
 
 func (g *Service) Serve() error {
@@ -167,5 +111,63 @@ func (g *Service) Dispose() {
 	if g.closeableHandler != nil {
 		zerolog.Ctx(g.service.Ctx).Debug().Msg("handler closed")
 		g.closeableHandler.Close()
+	}
+}
+func (g *Service) Metadata() map[string]string {
+	return g.service.Metadata()
+}
+func healthcheckIt(ctx context.Context, name string, healthcheck *health.Server, healthCheckHandler func(context.Context) error) {
+	next := healthpb.HealthCheckResponse_SERVING
+	for {
+		timer := time.NewTicker(5 * time.Second)
+		select {
+		case <-ctx.Done():
+			healthcheck.Shutdown()
+			return
+		case <-timer.C:
+			if err := healthCheckHandler(ctx); err != nil {
+				healthcheck.SetServingStatus(name, healthpb.HealthCheckResponse_NOT_SERVING)
+				next = healthpb.HealthCheckResponse_NOT_SERVING
+			} else {
+				if next == healthpb.HealthCheckResponse_NOT_SERVING {
+					healthcheck.SetServingStatus(name, healthpb.HealthCheckResponse_SERVING)
+				}
+			}
+		}
+	}
+}
+
+// Setters
+func WithAddr(a string) func(*grpcOptions) {
+	return func(r *grpcOptions) {
+		r.addr = a
+	}
+}
+func WithHealthCheckHandler(h func(context.Context) error) func(*grpcOptions) {
+	return func(r *grpcOptions) {
+		r.healthCheckHandler = h
+	}
+}
+func WithName(n string) func(*grpcOptions) {
+	return func(r *grpcOptions) {
+		r.name = n
+	}
+}
+
+func WithContext(ctx context.Context) func(*grpcOptions) {
+	return func(r *grpcOptions) {
+		r.ctx = ctx
+	}
+}
+
+func WithInitHandler(initHandler initHandler) func(*grpcOptions) {
+	return func(r *grpcOptions) {
+		r.initHandler = initHandler
+	}
+}
+
+func WithServiceDesc(serviceDesc *grpc.ServiceDesc) func(*grpcOptions) {
+	return func(r *grpcOptions) {
+		r.serviceDesc = serviceDesc
 	}
 }

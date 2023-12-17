@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/andrescosta/goico/pkg/env"
-	"github.com/andrescosta/goico/pkg/service/svcmeta"
+	"github.com/andrescosta/goico/pkg/service/meta"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
@@ -37,7 +37,7 @@ type OtelProvider struct {
 	meterProvider *metric.MeterProvider
 }
 
-func New(ctx context.Context, info svcmeta.Info) (*OtelProvider, error) {
+func New(ctx context.Context, info meta.Data) (*OtelProvider, error) {
 	if !env.AsBool("obs.enabled") {
 		return &OtelProvider{enabled: false}, nil
 	}

@@ -21,13 +21,6 @@ func GetFieldString[T any](q T, field string) string {
 	return u
 }
 
-func CanConvert[S any](i interface{}) bool {
-	var a S
-	t1 := reflect.TypeOf(i)
-	t2 := reflect.TypeOf(a)
-	return t1.ConvertibleTo(t2)
-}
-
 func NewInstance[T any](t T) T {
 	s := reflect.ValueOf(t)
 	if s.Kind() == reflect.Ptr {
