@@ -1,11 +1,29 @@
 package env
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 )
+
+const (
+	Development = "development"
+	Production  = "production"
+	Test        = "test"
+)
+
+var (
+	Environment  = Development
+	Environments = []string{Development, Production, Test}
+)
+
+var ErrNoEnvFileLoaded = errors.New(".env files were  not found. Configuration was not loaded")
 
 func Env(key string, defs ...string) string {
 	s, ok := os.LookupEnv(key)
@@ -68,6 +86,44 @@ func AsBool(key string, value ...bool) bool {
 func AsArray(key string, def string) []string {
 	v := Env(key, def)
 	return strings.Split(v, ",")
+}
+
+// Follows this convention:
+//
+//	https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use
+func Load() error {
+	loaded := false
+	Environment = os.Getenv("APP_ENV")
+	if strings.TrimSpace(Environment) == "" {
+		Environment = Development
+	} else {
+		if !slices.Contains(Environments, Environment) {
+			return fmt.Errorf("invalid environment %s", Environment)
+		}
+	}
+
+	if err := godotenv.Load(".env." + Environment + ".local"); err == nil {
+		loaded = true
+	}
+
+	if Environment != "test" {
+		if err := godotenv.Load(".env.local"); err == nil {
+			loaded = true
+		}
+	}
+
+	if err := godotenv.Load(".env." + Environment); err == nil {
+		loaded = true
+	}
+
+	if err := godotenv.Load(); err == nil {
+		loaded = true
+	}
+
+	if !loaded {
+		return ErrNoEnvFileLoaded
+	}
+	return nil
 }
 
 func getDefault[T any](values []T, default1 T) T {

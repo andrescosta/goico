@@ -77,12 +77,16 @@ func Subdirs(path string) ([]string, error) {
 	return dirs, nil
 }
 func Files(path string) ([]os.DirEntry, error) {
-	return files(path, func(d fs.DirEntry) bool {
+	return files(path, func(_ string, d fs.DirEntry) bool {
 		return !d.IsDir()
 	})
 }
-func Dirs(path string) ([]os.DirEntry, error) {
-	f, err := files(path, func(d fs.DirEntry) bool {
+func Dirs(pathDir string) ([]os.DirEntry, error) {
+	f, err := files(pathDir, func(path string, d fs.DirEntry) bool {
+		// If path is equal to provided directory path, we don't include it.
+		if path == pathDir {
+			return false
+		}
 		return d.IsDir()
 	})
 	if err != nil {
@@ -91,7 +95,7 @@ func Dirs(path string) ([]os.DirEntry, error) {
 	if len(f) == 0 {
 		return f, nil
 	}
-	return f[1:], nil
+	return f, nil
 }
 
 func OldestFile(path, preffix, suffix string) ([]byte, *string, error) {
@@ -204,16 +208,16 @@ func filesSorted(path string, preffix, suffix string) ([]os.DirEntry, error) {
 	return files, nil
 }
 
-func files(path string, filter func(fs.DirEntry) bool) ([]os.DirEntry, error) {
+func files(pathFiles string, filter func(string, fs.DirEntry) bool) ([]os.DirEntry, error) {
 	var files []fs.DirEntry
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := os.Stat(pathFiles); os.IsNotExist(err) {
 		return files, nil
 	}
-	err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(pathFiles, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if filter(d) {
+		if filter(path, d) {
 			files = append(files, d)
 		}
 		return nil

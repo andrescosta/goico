@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
@@ -27,7 +28,8 @@ func New(ctx context.Context) (*Runtime, error) {
 	var catWasm []byte
 
 	if _, err := r.InstantiateWithConfig(ctx, catWasm, config.WithArgs("wasi", os.Args[1])); err != nil {
-		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
+		exitErr := &sys.ExitError{}
+		if ok := errors.As(err, &exitErr); ok && exitErr.ExitCode() != 0 {
 			fmt.Fprintf(os.Stderr, "exit_code: %d\n", exitErr.ExitCode())
 		} else if !ok {
 			log.Panicln(err)

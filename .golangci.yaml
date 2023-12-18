@@ -17,7 +17,7 @@ run:
   # default: false
   allow-parallel-runners: true
 
-# goimports does not like proto files generated on windows
+# goimports does not like proto files
 # - 'goimports' 
 linters:
   enable:

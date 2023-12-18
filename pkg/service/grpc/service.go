@@ -20,7 +20,7 @@ import (
 type initHandler func(context.Context) (any, error)
 
 type grpcOptions struct {
-	addr               string
+	addr               *string
 	ctx                context.Context
 	name               string
 	initHandler        initHandler
@@ -49,7 +49,8 @@ func New(opts ...func(*grpcOptions)) (*Service, error) {
 
 	g := &Service{}
 	s, err := service.New(
-		service.WithAddr(&opt.addr),
+		service.WithName(opt.name),
+		service.WithAddr(opt.addr),
 		service.WithContext(opt.ctx),
 		service.WithKind("rest"),
 	)
@@ -138,7 +139,7 @@ func healthcheckIt(ctx context.Context, name string, healthcheck *health.Server,
 }
 
 // Setters
-func WithAddr(a string) func(*grpcOptions) {
+func WithAddr(a *string) func(*grpcOptions) {
 	return func(r *grpcOptions) {
 		r.addr = a
 	}

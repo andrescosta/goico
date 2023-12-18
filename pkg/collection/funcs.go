@@ -1,5 +1,7 @@
 package collection
 
+import "errors"
+
 func FirstOrDefault[T any](ds []T, df T) T {
 	d := df
 	if len(ds) > 0 {
@@ -9,12 +11,12 @@ func FirstOrDefault[T any](ds []T, df T) T {
 }
 
 func UnwrapError(err error) []error {
-	errStr := []error{err}
-	e, ok := err.(interface {
+	errorSlice := []error{err}
+	var k interface {
 		Unwrap() []error
-	})
-	if ok {
-		errStr = e.Unwrap()
 	}
-	return errStr
+	if errors.As(err, &k) {
+		errorSlice = k.Unwrap()
+	}
+	return errorSlice
 }

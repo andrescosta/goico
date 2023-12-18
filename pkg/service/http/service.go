@@ -39,7 +39,7 @@ type ServiceOptions struct {
 }
 
 type RouterOptions struct {
-	addr         string
+	addr         *string
 	extras       *extrasOptions
 	ctx          context.Context
 	name         string
@@ -54,14 +54,22 @@ func NewWithWouter(opts ...func(*RouterOptions)) (*Service, error) {
 	svc := &Service{}
 	svc.initWithDefaults()
 
-	opt := &RouterOptions{}
+	opt := &RouterOptions{
+		extras:       &extrasOptions{},
+		ctx:          context.Background(),
+		initRoutesFn: func(ctx context.Context, r *mux.Router) error { return nil },
+		addr:         nil,
+		name:         "",
+	}
+
 	for _, o := range opts {
 		o(opt)
 	}
 
 	//
 	s, err := service.New(
-		service.WithAddr(&opt.addr),
+		service.WithName(opt.name),
+		service.WithAddr(opt.addr),
 		service.WithContext(opt.ctx),
 		service.WithKind("rest"),
 	)
@@ -78,7 +86,9 @@ func NewWithWouter(opts ...func(*RouterOptions)) (*Service, error) {
 		return nil, err
 	}
 	// add health check handler if provided
-	svc.initHealthCheckFn(opt.extras.healthChkFn, router)
+	if opt.extras.healthChkFn != nil {
+		svc.initHealthCheckFn(opt.extras.healthChkFn, router)
+	}
 	return svc, nil
 }
 
@@ -86,7 +96,10 @@ func NewWithServiceContainer(opts ...func(*ServiceOptions)) (*Service, error) {
 	svc := &Service{}
 	svc.initWithDefaults()
 
-	opt := &ServiceOptions{}
+	opt := &ServiceOptions{
+		extras:  &extrasOptions{},
+		service: nil,
+	}
 	for _, o := range opts {
 		o(opt)
 	}
@@ -160,13 +173,12 @@ func (s *Service) metadataHandler(w http.ResponseWriter, _ *http.Request) {
 }
 
 // Setters
-
 func WithInitRoutesFn(i initRoutesFn) func(*RouterOptions) {
 	return func(w *RouterOptions) {
 		w.initRoutesFn = i
 	}
 }
-func WithAddr(a string) func(*RouterOptions) {
+func WithAddr(a *string) func(*RouterOptions) {
 	return func(r *RouterOptions) {
 		r.addr = a
 	}
@@ -201,10 +213,8 @@ func WithContainer(svc *service.Service) func(*ServiceOptions) {
 }
 
 func (s *Service) initHealthCheckFn(h HealthChkFn, r *mux.Router) {
-	if h != nil {
-		s.healthCheckFunc = h
-		r.HandleFunc("/health", s.healthCheckHandler)
-	}
+	s.healthCheckFunc = h
+	r.HandleFunc("/health", s.healthCheckHandler)
 }
 
 func (s *Service) setServer(r *mux.Router) {

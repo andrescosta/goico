@@ -106,7 +106,7 @@ func New(ctx context.Context, info meta.Data) (*OtelProvider, error) {
 				done()
 				if err != nil {
 					handleErr(err)
-					return nil, fmt.Errorf("failed to create trace exporter: %w", err)
+					return nil, fmt.Errorf("grpc.DialContext: failed to connect to trace sever due to: %w", err)
 				}
 				// trace
 				e, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
@@ -147,7 +147,7 @@ func New(ctx context.Context, info meta.Data) (*OtelProvider, error) {
 				done()
 				if err != nil {
 					handleErr(err)
-					return nil, fmt.Errorf("failed to create neter exporter: %w", err)
+					return nil, fmt.Errorf("grpc.DialContext: failed to connect to metric server due to: %w", err)
 				}
 				m, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithGRPCConn(conn))
 				if err != nil {
