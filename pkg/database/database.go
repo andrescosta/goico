@@ -21,7 +21,6 @@ func Open(path string) (*Database, error) {
 		db: db,
 	}, nil
 }
-
 func (s *Database) Close() error {
 	if err := s.db.Close(); err != nil {
 		return err
