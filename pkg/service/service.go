@@ -51,7 +51,7 @@ func New(opts ...Setter) (*Service, error) {
 	}
 
 	// .env files loading
-	if err := env.Load(); err != nil {
+	if err := env.Load(svc.Name); err != nil {
 		return nil, errors.Join(err, ErrEnvLoading)
 	}
 

@@ -91,7 +91,7 @@ func AsArray(key string, def string) []string {
 // Follows this convention:
 //
 //	https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use
-func Load() error {
+func Load(name string) error {
 	loaded := false
 	Environment = os.Getenv("APP_ENV")
 	if strings.TrimSpace(Environment) == "" {
@@ -113,6 +113,10 @@ func Load() error {
 	}
 
 	if err := godotenv.Load(".env." + Environment); err == nil {
+		loaded = true
+	}
+
+	if err := godotenv.Load(".env." + name); err == nil {
 		loaded = true
 	}
 

@@ -2,6 +2,7 @@ package log
 
 import (
 	"io"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -67,8 +68,14 @@ func newLogger(ctxInfo map[string]string, cfg config) *zerolog.Logger {
 	if cfg.file.Enabled && strings.TrimSpace(cfg.file.Name) != "" {
 		writers = append(writers, configureLogToFile(cfg.file))
 	}
+	level := cfg.Level
+	if len(writers) == 0 {
+		log.Println("Console and file loggers disabled. Logging is not enabled.")
+		level = zerolog.Disabled
+		writers = append(writers, io.Discard)
+	}
 	mw := io.MultiWriter(writers...)
-	zerolog.SetGlobalLevel(cfg.Level)
+	zerolog.SetGlobalLevel(level)
 	ctx := zerolog.New(mw).With().Timestamp()
 	if cfg.Caller {
 		ctx = ctx.Caller()
