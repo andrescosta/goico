@@ -50,7 +50,7 @@ func NewWithContext(ctxInfo map[string]string) *zerolog.Logger {
 		file: file{
 			Enabled:          env.AsBool("log.file.enabled", false),
 			EncodeLogsAsJSON: env.AsBool("log.file.JSON", false),
-			Directory:        env.Env("log.file.dir", ".\\log"),
+			Directory:        env.Env("log.file.dir", "."),
 			Name:             env.Env("log.file.name", "file.log"),
 			MaxSize:          env.AsInt("log.file.max.size", 100),
 			MaxBackups:       env.AsInt("log.file.max.backups", 10),
