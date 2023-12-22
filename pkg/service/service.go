@@ -52,9 +52,10 @@ func New(opts ...Setter) (*Service, error) {
 
 	// .env files loading
 	if err := env.Load(svc.Name); err != nil {
-		return nil, errors.Join(err, ErrEnvLoading)
+		if !errors.Is(err, env.ErrNoEnvFileLoaded) {
+			return nil, errors.Join(err, ErrEnvLoading)
+		}
 	}
-
 	// OS signal handling
 	svc.Ctx, svc.done = signal.NotifyContext(svc.Ctx, syscall.SIGINT, syscall.SIGTERM)
 

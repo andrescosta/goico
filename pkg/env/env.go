@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -147,6 +148,12 @@ func getDefault[T any](values []T, default1 T) T {
 
 func WorkDir() string {
 	return Env(envWorkDir, fmt.Sprint(".", string(os.PathSeparator)))
+}
+
+func InWorkDir(dir ...string) (ret string) {
+	dir = append([]string{WorkDir()}, dir...)
+	ret = path.Join(dir...)
+	return
 }
 
 func BaseDir() string {

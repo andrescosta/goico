@@ -4,7 +4,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -50,14 +49,19 @@ func NewWithContext(ctxInfo map[string]string) *zerolog.Logger {
 		file: file{
 			Enabled:          env.AsBool("log.file.enabled", false),
 			EncodeLogsAsJSON: env.AsBool("log.file.JSON", false),
-			Directory:        env.Env("log.file.dir", "."),
-			Name:             env.Env("log.file.name", "file.log"),
+			Name:             getFileName(),
 			MaxSize:          env.AsInt("log.file.max.size", 100),
 			MaxBackups:       env.AsInt("log.file.max.backups", 10),
 			MaxAge:           env.AsInt("log.file.max.age", 24),
 		},
 	}
 	return newLogger(ctxInfo, cfg)
+}
+
+func getFileName() (name string) {
+	name = env.Env("log.file.name", "file.log")
+	name = strings.Replace(name, "{workdir}", env.WorkDir(), 1)
+	return
 }
 
 func newLogger(ctxInfo map[string]string, cfg config) *zerolog.Logger {
@@ -106,7 +110,7 @@ func configureLogToFile(cfg file) (writer io.Writer) {
 
 func configureLumberjack(cfg file) (writer io.Writer) {
 	writer = &lumberjack.Logger{
-		Filename:   path.Join(cfg.Directory, cfg.Name),
+		Filename:   cfg.Name,
 		MaxBackups: cfg.MaxBackups,
 		MaxSize:    cfg.MaxSize,
 		MaxAge:     cfg.MaxAge,
