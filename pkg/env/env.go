@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -16,13 +18,15 @@ const (
 	Development = "development"
 	Production  = "production"
 	Test        = "test"
+	envWorkDir  = "workdir"
+	envBaseDir  = "basedir"
+	fileDefault = ".env"
 )
 
 var (
 	Environment  = Development
 	Environments = []string{Development, Production, Test}
 )
-
 var ErrNoEnvFileLoaded = errors.New(".env files were  not found. Configuration was not loaded")
 
 func Env(key string, defs ...string) string {
@@ -91,8 +95,11 @@ func AsArray(key string, def string) []string {
 // Follows this convention:
 //
 //	https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use
-func Load() error {
+func Load(name string) error {
 	loaded := false
+
+	// We call it because "basedir" set
+	setEnvsUsingCommandLineArgs()
 	Environment = os.Getenv("APP_ENV")
 	if strings.TrimSpace(Environment) == "" {
 		Environment = Development
@@ -102,27 +109,33 @@ func Load() error {
 		}
 	}
 
-	if err := godotenv.Load(".env." + Environment + ".local"); err == nil {
+	if err := loadUsingGoDot(".env." + Environment + ".local"); err == nil {
 		loaded = true
 	}
 
 	if Environment != "test" {
-		if err := godotenv.Load(".env.local"); err == nil {
+		if err := loadUsingGoDot(".env.local"); err == nil {
 			loaded = true
 		}
 	}
 
-	if err := godotenv.Load(".env." + Environment); err == nil {
+	if err := loadUsingGoDot(".env." + Environment); err == nil {
 		loaded = true
 	}
 
-	if err := godotenv.Load(); err == nil {
+	if err := loadUsingGoDot(".env." + name); err == nil {
+		loaded = true
+	}
+
+	if err := loadUsingGoDot(fileDefault); err == nil {
 		loaded = true
 	}
 
 	if !loaded {
 		return ErrNoEnvFileLoaded
 	}
+	// We call it again to override the env values with command line ones
+	setEnvsUsingCommandLineArgs()
 	return nil
 }
 
@@ -131,4 +144,32 @@ func getDefault[T any](values []T, default1 T) T {
 		return default1
 	}
 	return values[0]
+}
+
+func WorkDir() string {
+	return Env(envWorkDir, fmt.Sprint(".", string(os.PathSeparator)))
+}
+
+func InWorkDir(dir ...string) (ret string) {
+	dir = append([]string{WorkDir()}, dir...)
+	ret = path.Join(dir...)
+	return
+}
+
+func BaseDir() string {
+	return Env(envBaseDir, fmt.Sprint(".", string(os.PathSeparator)))
+}
+
+func getDir(dir string) string {
+	return filepath.Join(BaseDir(), dir)
+}
+
+func loadUsingGoDot(files ...string) (err error) {
+	for _, f := range files {
+		err = godotenv.Load(getDir(f))
+		if err != nil {
+			return
+		}
+	}
+	return
 }
