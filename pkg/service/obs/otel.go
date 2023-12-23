@@ -197,7 +197,7 @@ func New(ctx context.Context, info meta.Data) (*OtelProvider, error) {
 		}
 	}
 
-	//runtime telemetry
+	// runtime telemetry
 	if env.AsBool("obs.metrics.runtime") {
 		err = runtime.Start(runtime.WithMinimumReadMemStatsInterval(interval))
 		if err != nil {

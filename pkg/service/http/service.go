@@ -30,8 +30,10 @@ type healthStatus struct {
 	details map[string]string
 }
 
-type initRoutesFn = func(context.Context, *mux.Router) error
-type HealthChkFn = func(context.Context) (map[string]string, error)
+type (
+	initRoutesFn = func(context.Context, *mux.Router) error
+	HealthChkFn  = func(context.Context) (map[string]string, error)
+)
 
 type ServiceOptions struct {
 	extras  *extrasOptions
@@ -178,11 +180,13 @@ func WithInitRoutesFn(i initRoutesFn) func(*RouterOptions) {
 		w.initRoutesFn = i
 	}
 }
+
 func WithAddr(a *string) func(*RouterOptions) {
 	return func(r *RouterOptions) {
 		r.addr = a
 	}
 }
+
 func WithName(n string) func(*RouterOptions) {
 	return func(r *RouterOptions) {
 		r.name = n

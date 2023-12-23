@@ -108,15 +108,18 @@ func (g *Service) Serve() error {
 	logger.Info().Msgf("Process %d ended ", os.Getpid())
 	return nil
 }
+
 func (g *Service) Dispose() {
 	if g.closeableHandler != nil {
 		zerolog.Ctx(g.service.Ctx).Debug().Msg("handler closed")
 		g.closeableHandler.Close()
 	}
 }
+
 func (g *Service) Metadata() map[string]string {
 	return g.service.Metadata()
 }
+
 func healthcheckIt(ctx context.Context, name string, healthcheck *health.Server, healthCheckHandler func(context.Context) error) {
 	next := healthpb.HealthCheckResponse_SERVING
 	for {
@@ -144,11 +147,13 @@ func WithAddr(a *string) func(*grpcOptions) {
 		r.addr = a
 	}
 }
+
 func WithHealthCheckHandler(h func(context.Context) error) func(*grpcOptions) {
 	return func(r *grpcOptions) {
 		r.healthCheckHandler = h
 	}
 }
+
 func WithName(n string) func(*grpcOptions) {
 	return func(r *grpcOptions) {
 		r.name = n

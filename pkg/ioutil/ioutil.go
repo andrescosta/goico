@@ -28,6 +28,7 @@ func WriteToRandomFile(path, preffix, suffix string, data []byte) (string, error
 	}
 	return fullpath, nil
 }
+
 func FileExists(fullPath string) (bool, error) {
 	_, err := os.Stat(fullPath)
 	if err != nil {
@@ -38,6 +39,7 @@ func FileExists(fullPath string) (bool, error) {
 	}
 	return true, nil
 }
+
 func CreateEmptyIfNotExists(fullpath string) error {
 	e, err := FileExists(fullpath)
 	if err != nil {
@@ -48,6 +50,7 @@ func CreateEmptyIfNotExists(fullpath string) error {
 	}
 	return nil
 }
+
 func Write(file string, data []byte) error {
 	f, err := os.Create(file)
 	if err != nil {
@@ -65,6 +68,7 @@ func Write(file string, data []byte) error {
 	}
 	return nil
 }
+
 func Subdirs(path string) ([]string, error) {
 	dires, err := os.ReadDir(path)
 	if err != nil {
@@ -76,11 +80,13 @@ func Subdirs(path string) ([]string, error) {
 	}
 	return dirs, nil
 }
+
 func Files(path string) ([]os.DirEntry, error) {
 	return files(path, func(_ string, d fs.DirEntry) bool {
 		return !d.IsDir()
 	})
 }
+
 func Dirs(pathDir string) ([]os.DirEntry, error) {
 	f, err := files(pathDir, func(path string, d fs.DirEntry) bool {
 		// If path is equal to provided directory path, we don't include it.
@@ -183,6 +189,7 @@ loop:
 	slices.Reverse(accLines)
 	return accLines, nil
 }
+
 func filesSorted(path string, preffix, suffix string) ([]os.DirEntry, error) {
 	var files []fs.DirEntry
 	if _, err := os.Stat(path); os.IsNotExist(err) {

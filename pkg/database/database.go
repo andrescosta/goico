@@ -11,7 +11,7 @@ type Database struct {
 }
 
 func Open(path string) (*Database, error) {
-	db, err := bolt.Open(path, 0600, &bolt.Options{
+	db, err := bolt.Open(path, 0o600, &bolt.Options{
 		Timeout: 3 * time.Second,
 	})
 	if err != nil {
@@ -21,6 +21,7 @@ func Open(path string) (*Database, error) {
 		db: db,
 	}, nil
 }
+
 func (s *Database) Close() error {
 	if err := s.db.Close(); err != nil {
 		return err

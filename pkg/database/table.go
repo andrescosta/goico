@@ -33,6 +33,7 @@ func NewTable[S any](_ context.Context, db *Database, name string, marshaler Mar
 	}
 	return table, nil
 }
+
 func (s *Table[S]) Add(_ context.Context, data S) (uint64, error) {
 	var id uint64
 	if err := s.db.db.Update(func(tx *bolt.Tx) error {
@@ -54,6 +55,7 @@ func (s *Table[S]) Add(_ context.Context, data S) (uint64, error) {
 	}
 	return id, nil
 }
+
 func (s *Table[S]) Update(_ context.Context, data S) error {
 	if err := s.db.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(s.name))
@@ -74,6 +76,7 @@ func (s *Table[S]) Update(_ context.Context, data S) error {
 	}
 	return nil
 }
+
 func (s *Table[S]) Delete(_ context.Context, id string) error {
 	if err := s.db.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(s.name))
@@ -89,6 +92,7 @@ func (s *Table[S]) Delete(_ context.Context, id string) error {
 	}
 	return nil
 }
+
 func (s *Table[S]) Get(_ context.Context, id string) (*S, error) {
 	var data *S
 	if err := s.db.db.View(func(tx *bolt.Tx) error {
@@ -110,6 +114,7 @@ func (s *Table[S]) Get(_ context.Context, id string) (*S, error) {
 	}
 	return data, nil
 }
+
 func (s *Table[S]) All(ctx context.Context) ([]S, error) {
 	var data []S
 	data = make([]S, 0)

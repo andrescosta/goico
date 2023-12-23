@@ -1,4 +1,6 @@
-GOFMT_FILES = $(shell find . -type f -name '*.go' -not -path "*.pb.go")
+FORMAT_FILES = $(shell find . -type f -name '*.go' -not -path "*.pb.go")
+
+.PHONY: lint vuln release format $(FORMAT_FILES)
 
 lint:
 	golangci-lint run ./...
@@ -6,11 +8,9 @@ lint:
 vuln:
 	govulncheck ./...
 
-gofmt: $(GOFMT_FILES)  
+format: $(FORMAT_FILES)  
 
-$(GOFMT_FILES):
-	@gofmt -s -w $@
+$(FORMAT_FILES):
+	@gofumpt -w $@
 
-release: gofmt lint vuln 
-
-.PHONY: lint vuln release gofmt $(GOFMT_FILES)
+release: format lint vuln 

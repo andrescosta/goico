@@ -92,10 +92,12 @@ func (s *Service) WhenStarted() time.Time {
 }
 
 func (s *Service) Metadata() map[string]string {
-	m := map[string]string{"Name": s.Name,
+	m := map[string]string{
+		"Name":       s.Name,
 		"Addr":       *s.Addr,
 		"Start Time": s.WhenStarted().Format(time.UnixDate),
-		"Kind":       s.Kind}
+		"Kind":       s.Kind,
+	}
 	return m
 }
 
@@ -125,6 +127,7 @@ func WithMetaInfo(meta *meta.Data) Setter {
 		s.meta = meta
 	}
 }
+
 func WithName(name string) Setter {
 	return func(s *Service) {
 		s.Name = name

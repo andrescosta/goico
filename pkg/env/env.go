@@ -46,7 +46,7 @@ func OrNil(key string) *string {
 }
 
 func AsDuration(key string, values ...time.Duration) *time.Duration {
-	var def = func(v []time.Duration) *time.Duration {
+	def := func(v []time.Duration) *time.Duration {
 		if len(v) == 0 {
 			return nil
 		}
