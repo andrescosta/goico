@@ -30,7 +30,7 @@ func (s *RecoveryFunc) TryToRecover() mux.MiddlewareFunc {
 				if p := recover(); p != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					s.logError(r.Context(), p)
-					// TODO: if the header was already written this will log an error
+					// TODO: if the header was already written this will generate an error
 					return
 				}
 			}()

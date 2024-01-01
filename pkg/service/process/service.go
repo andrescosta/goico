@@ -1,4 +1,4 @@
-package headless
+package process
 
 import (
 	"context"
@@ -61,7 +61,7 @@ func New(opts ...func(*Option)) (*Service, error) {
 	return s, nil
 }
 
-func (s Service) Start() error {
+func (s Service) Serve() error {
 	logger := zerolog.Ctx(s.service.Ctx)
 	if s.helperService != nil {
 		logger.Info().Msgf("Starting helper service %d ", os.Getpid())
