@@ -13,46 +13,47 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
+type ModuleType uint32
+type LogExt func(context.Context, uint32, uint32, string) error
+
 type WasmModuleString struct {
-	mainFunc api.Function
-
-	initFunc api.Function
-
+	mainFunc   api.Function
+	initFunc   api.Function
 	mallocFunc api.Function
-
-	freeFunc api.Function
-
+	freeFunc   api.Function
+	logExt     LogExt
 	FreeAdpter func(context.Context, uint64, uint64) ([]uint64, error)
-
-	module api.Module
-
-	ver ModuleType
+	module     api.Module
+	ver        ModuleType
 }
 
-type ModuleType uint32
-
-const (
-	TypeDefault ModuleType = iota
-
-	TypeRust
-)
-
 type EventFuncResult struct {
-	ResponseCode uint64
-
+	ResponseCode  uint64
 	ResultPtrSize uint64
 }
 
-func NewWasmModuleString(ctx context.Context, _ string, runtime *WasmRuntime, wasmModule []byte, mainFuncName string) (*WasmModuleString, error) {
+const (
+	TypeDefault ModuleType = iota
+	TypeRust
+)
+
+func NewWasmModuleString(ctx context.Context, runtime *WasmRuntime, wasmModule []byte, mainFuncName string, logExt LogExt) (*WasmModuleString, error) {
+	wm := &WasmModuleString{
+		logExt: logExt,
+	}
+
 	wazeroRuntime := wazero.NewRuntimeWithConfig(ctx, runtime.runtimeConfig)
+
 	// env is used by the module name used by the SDKs.
 	// TODO: change it to something more appropriate like sdk
+	// This call instantiate an ENV. DON'T MOVE IT.
 	_, err := wazeroRuntime.NewHostModuleBuilder("env").
-		NewFunctionBuilder().WithFunc(logForExport).Export("log").
+		NewFunctionBuilder().WithFunc(wm.logForExport).Export("log").
 		Instantiate(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	wasi_snapshot_preview1.MustInstantiate(ctx, wazeroRuntime)
 	module, err := wazeroRuntime.Instantiate(ctx, wasmModule)
 	if err != nil {
@@ -66,24 +67,23 @@ func NewWasmModuleString(ctx context.Context, _ string, runtime *WasmRuntime, wa
 			ver = ModuleType(v[0])
 		}
 	}
-	// TODO: Replace init with _start
+	// TODO: Replace init with _start or _init
 	initf := module.ExportedFunction("init")
-	wr := &WasmModuleString{
-		mainFunc: module.ExportedFunction(mainFuncName),
-		initFunc: initf,
-		// These are undocumented, but exported. See tinygo-org/tinygo#2788
-		mallocFunc: module.ExportedFunction("malloc"),
-		freeFunc:   module.ExportedFunction("free"),
-		module:     module,
-		ver:        ver,
-	}
-	wr.FreeAdpter = wr.free
+	wm.mainFunc = module.ExportedFunction(mainFuncName)
+	wm.initFunc = initf
+	// These are undocumented, but exported. See tinygo-org/tinygo#2788
+	wm.mallocFunc = module.ExportedFunction("malloc")
+	wm.freeFunc = module.ExportedFunction("free")
+	wm.module = module
+	wm.ver = ver
+
+	wm.FreeAdpter = wm.free
 	// Call the init function to initialize the module
 	_, err = initf.Call(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return wr, nil
+	return wm, nil
 }
 
 func (f *WasmModuleString) free(ctx context.Context, ptr, size uint64) ([]uint64, error) {
@@ -93,7 +93,7 @@ func (f *WasmModuleString) free(ctx context.Context, ptr, size uint64) ([]uint64
 	return f.freeFunc.Call(ctx, ptr, size)
 }
 
-func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, data string) (uint64, string, error) {
+func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, id uint32, data string) (uint64, string, error) {
 	logger := zerolog.Ctx(ctx)
 	// reserve memory for the string parameter
 	funcParameterPtr, funcParameterSize, err := f.writeParameterToMemory(ctx, data)
@@ -118,7 +118,7 @@ func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, data string) (ui
 	}()
 	logger.Debug().Msg("calling main method")
 	// The result of the call will be stored in struct pointed by resultFuncPtr
-	_, err = f.mainFunc.Call(ctx, resultFuncPtr, funcParameterPtr, funcParameterSize)
+	_, err = f.mainFunc.Call(ctx, resultFuncPtr, api.EncodeU32(id), funcParameterPtr, funcParameterSize)
 	if err != nil {
 		return 0, "", err
 	}
@@ -190,13 +190,19 @@ func (f *WasmModuleString) readDataFromMemory(ctx context.Context, eventResultPt
 	return string(bytes), nil
 }
 
-func logForExport(ctx context.Context, m api.Module, level, offset, byteCount uint32) {
+func (f *WasmModuleString) logForExport(ctx context.Context, m api.Module, id, level, offset, byteCount uint32) {
 	logger := zerolog.Ctx(ctx)
 	buf, ok := m.Memory().Read(offset, byteCount)
 	if !ok {
 		logger.Error().Msgf("Memory.Read(%d, %d) out of range", offset, byteCount)
 	}
-	logger.WithLevel(zerolog.Level(level)).Msg(string(buf))
+	msg := string(buf)
+	logger.WithLevel(zerolog.Level(level)).Msg(msg)
+	if f.logExt != nil {
+		if err := f.logExt(ctx, id, level, msg); err != nil {
+			logger.Err(err).Msg("error executing log extension function.")
+		}
+	}
 }
 
 func (f *WasmModuleString) Close(ctx context.Context) {
