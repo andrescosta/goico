@@ -13,8 +13,10 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
-type ModuleType uint32
-type LogExt func(context.Context, uint32, uint32, string) error
+type (
+	ModuleType uint32
+	LogExt     func(context.Context, uint32, uint32, string) error
+)
 
 type WasmModuleString struct {
 	mainFunc   api.Function
@@ -206,5 +208,8 @@ func (f *WasmModuleString) logForExport(ctx context.Context, m api.Module, id, l
 }
 
 func (f *WasmModuleString) Close(ctx context.Context) {
-	f.module.Close(ctx)
+	logger := zerolog.Ctx(ctx)
+	if err := f.module.Close(ctx); err != nil {
+		logger.Err(err).Msg("error closing wasm runtime.")
+	}
 }

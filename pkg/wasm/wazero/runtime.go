@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/rs/zerolog"
 	"github.com/tetratelabs/wazero"
 )
 
@@ -38,10 +39,15 @@ func NewWasmRuntime(ctx context.Context, tempDir string) (*WasmRuntime, error) {
 }
 
 func (r *WasmRuntime) Close(ctx context.Context) {
+	logger := zerolog.Ctx(ctx)
 	if r.cacheDir != nil {
-		os.RemoveAll(*r.cacheDir)
+		if err := os.RemoveAll(*r.cacheDir); err != nil {
+			logger.Err(err).Msg("error deleting cache files.")
+		}
 	}
 	if r.cache != nil {
-		r.cache.Close(ctx)
+		if err := r.cache.Close(ctx); err != nil {
+			logger.Err(err).Msg("error closing wasm runtime.")
+		}
 	}
 }

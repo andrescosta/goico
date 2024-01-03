@@ -110,9 +110,12 @@ func (g *Service) Serve() error {
 }
 
 func (g *Service) Dispose() {
+	logger := zerolog.Ctx(g.service.Ctx)
 	if g.closeableHandler != nil {
-		zerolog.Ctx(g.service.Ctx).Debug().Msg("handler closed")
-		g.closeableHandler.Close()
+		logger.Debug().Msg("handler closed")
+		if err := g.closeableHandler.Close(); err != nil {
+			logger.Err(err).Msg("grp service.Dispose: error closing resource")
+		}
 	}
 }
 

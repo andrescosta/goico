@@ -10,16 +10,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type ProcessType func(ctx context.Context) error
+type TypeFn func(ctx context.Context) error
 
 type Service struct {
 	service       *service.Service
-	process       ProcessType
+	process       TypeFn
 	helperService *http.Service
 }
 
 type Option struct {
-	serveHandler  ProcessType
+	serveHandler  TypeFn
 	healthCheckFN http.HealthChkFn
 	ctx           context.Context
 	name          string

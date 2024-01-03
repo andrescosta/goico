@@ -27,7 +27,7 @@ func NewInfoClient(ctx context.Context, host string) (*ServerInfoClient, error) 
 }
 
 func (c *ServerInfoClient) Close() {
-	c.conn.Close()
+	_ = c.conn.Close()
 }
 
 func (c *ServerInfoClient) Info(ctx context.Context, in *GrpcMetadataRequest) ([]*GrpcServerMetadata, error) {

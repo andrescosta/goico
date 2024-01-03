@@ -2,11 +2,13 @@ package yamlutil
 
 import (
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 )
 
 func DecodeFile[T any](name string, t *T) error {
+	name = filepath.Clean(name)
 	f, err := os.Open(name)
 	if err != nil {
 		return err

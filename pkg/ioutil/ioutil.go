@@ -15,6 +15,7 @@ import (
 )
 
 func WriteToRandomFile(path, preffix, suffix string, data []byte) (string, error) {
+	path = filepath.Clean(path)
 	if err := os.MkdirAll(path, os.ModeExclusive); err != nil {
 		return "", err
 	}
@@ -22,6 +23,7 @@ func WriteToRandomFile(path, preffix, suffix string, data []byte) (string, error
 	if err != nil {
 		return "", err
 	}
+	fn = filepath.Clean(fn)
 	fullpath := filepath.Join(path, fn)
 	if err := Write(fullpath, data); err != nil {
 		return "", err
@@ -51,22 +53,29 @@ func CreateEmptyIfNotExists(fullpath string) error {
 	return nil
 }
 
-func Write(file string, data []byte) error {
+func Write(file string, data []byte) (errr error) {
+	file = filepath.Clean(file)
 	f, err := os.Create(file)
 	if err != nil {
-		return errors.Join(errors.New("error creating file"), err)
+		errr = errors.Join(errors.New("error creating file"), err)
+		return
 	}
 	defer func() {
-		f.Close()
+		err := f.Close()
+		if err != nil {
+			errr = errors.Join(errors.New("error closing the file"), err)
+		}
 	}()
 	w := bufio.NewWriter(f)
 	if _, err := w.Write(data); err != nil {
-		return errors.Join(errors.New("error writing file"), err)
+		errr = errors.Join(errors.New("error writing file"), err)
+		return
 	}
 	if err := w.Flush(); err != nil {
-		return errors.Join(errors.New("error flushing data"), err)
+		errr = errors.Join(errors.New("error flushing data"), err)
+		return
 	}
-	return nil
+	return
 }
 
 func Subdirs(path string) ([]string, error) {
@@ -113,6 +122,7 @@ func OldestFile(path, preffix, suffix string) ([]byte, *string, error) {
 		return nil, nil, nil
 	}
 	filename := filepath.Join(path, files[0].Name())
+	filename = filepath.Clean(filename)
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, nil, err
@@ -122,6 +132,7 @@ func OldestFile(path, preffix, suffix string) ([]byte, *string, error) {
 
 func LastLines(file string, nlines int, skipEmpty bool, noincludecrlf bool) ([]string, error) {
 	bufferSize := int64(4096)
+	file = filepath.Clean(file)
 	fileHandle, err := os.Open(file)
 	if err != nil {
 		return nil, err
