@@ -38,6 +38,7 @@ func New() *zerolog.Logger {
 	var empty map[string]string
 	return NewWithContext(empty)
 }
+
 func NewWithContext(ctxInfo map[string]string) *zerolog.Logger {
 	cfg := config{
 		console: console{

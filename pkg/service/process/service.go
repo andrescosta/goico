@@ -1,4 +1,4 @@
-package headless
+package process
 
 import (
 	"context"
@@ -10,16 +10,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type ProcessType func(ctx context.Context) error
+type TypeFn func(ctx context.Context) error
 
 type Service struct {
 	service       *service.Service
-	process       ProcessType
+	process       TypeFn
 	helperService *http.Service
 }
 
 type Option struct {
-	serveHandler  ProcessType
+	serveHandler  TypeFn
 	healthCheckFN http.HealthChkFn
 	ctx           context.Context
 	name          string
@@ -61,7 +61,7 @@ func New(opts ...func(*Option)) (*Service, error) {
 	return s, nil
 }
 
-func (s Service) Start() error {
+func (s Service) Serve() error {
 	logger := zerolog.Ctx(s.service.Ctx)
 	if s.helperService != nil {
 		logger.Info().Msgf("Starting helper service %d ", os.Getpid())

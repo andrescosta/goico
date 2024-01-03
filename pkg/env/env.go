@@ -46,7 +46,7 @@ func OrNil(key string) *string {
 }
 
 func AsDuration(key string, values ...time.Duration) *time.Duration {
-	var def = func(v []time.Duration) *time.Duration {
+	def := func(v []time.Duration) *time.Duration {
 		if len(v) == 0 {
 			return nil
 		}
@@ -99,7 +99,9 @@ func Load(name string) error {
 	loaded := false
 
 	// We call it because "basedir" set
-	setEnvsUsingCommandLineArgs()
+	if err := setEnvsUsingCommandLineArgs(); err != nil {
+		return err
+	}
 	Environment = os.Getenv("APP_ENV")
 	if strings.TrimSpace(Environment) == "" {
 		Environment = Development
@@ -135,7 +137,9 @@ func Load(name string) error {
 		return ErrNoEnvFileLoaded
 	}
 	// We call it again to override the env values with command line ones
-	setEnvsUsingCommandLineArgs()
+	if err := setEnvsUsingCommandLineArgs(); err != nil {
+		return err
+	}
 	return nil
 }
 

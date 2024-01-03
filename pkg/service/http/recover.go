@@ -30,7 +30,7 @@ func (s *RecoveryFunc) TryToRecover() mux.MiddlewareFunc {
 				if p := recover(); p != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					s.logError(r.Context(), p)
-					//TODO: if the header was already written this will log an error
+					// TODO: if the header was already written this will generate an error
 					return
 				}
 			}()
@@ -38,6 +38,7 @@ func (s *RecoveryFunc) TryToRecover() mux.MiddlewareFunc {
 		})
 	}
 }
+
 func (s *RecoveryFunc) logError(ctx context.Context, a any) {
 	logger := zerolog.Ctx(ctx)
 	logger.Error().Msgf("Recovering from fatal error: %v", a)
@@ -47,6 +48,7 @@ func (s *RecoveryFunc) logError(ctx context.Context, a any) {
 		logger.Error().Msg(format(walk()))
 	}
 }
+
 func format(f []*runtime.Frame) string {
 	var result string
 	for _, ff := range f {
@@ -54,6 +56,7 @@ func format(f []*runtime.Frame) string {
 	}
 	return result
 }
+
 func walk() []*runtime.Frame {
 	var pcs [40]uintptr
 	var frames [40]*runtime.Frame

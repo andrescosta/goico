@@ -13,10 +13,12 @@ func NewSyncMap[T comparable, S any]() *SyncMap[T, S] {
 		lock: &sync.RWMutex{},
 	}
 }
+
 func (s *SyncMap[T, S]) Swap(k T, v S) {
 	s.Delete(k)
 	s.Store(k, v)
 }
+
 func (s *SyncMap[T, S]) Store(k T, v S) {
 	s.lock.Lock()
 	defer s.lock.Unlock()

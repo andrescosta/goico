@@ -45,6 +45,7 @@ func Start[T any](ctx context.Context) *Broadcaster[T] {
 	}(b)
 	return b
 }
+
 func (b *Broadcaster[T]) Stop() {
 	b.cancel()
 	b.listeners.Range(func(k any, _ any) bool {
@@ -52,18 +53,21 @@ func (b *Broadcaster[T]) Stop() {
 		return true
 	})
 }
+
 func (b *Broadcaster[T]) Subscribe() *Listener[T] {
 	m := make(chan T, 1)
 	l := &Listener[T]{C: m}
 	b.listeners.Store(l, m)
 	return l
 }
+
 func (b *Broadcaster[T]) Unsubscribe(l *Listener[T]) {
 	c, ok := b.listeners.LoadAndDelete(l)
 	if ok {
 		close(c.(chan T))
 	}
 }
+
 func (b *Broadcaster[T]) Write(t T) {
 	go func() {
 		select {

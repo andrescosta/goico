@@ -30,8 +30,10 @@ type healthStatus struct {
 	details map[string]string
 }
 
-type initRoutesFn = func(context.Context, *mux.Router) error
-type HealthChkFn = func(context.Context) (map[string]string, error)
+type (
+	initRoutesFn = func(context.Context, *mux.Router) error
+	HealthChkFn  = func(context.Context) (map[string]string, error)
+)
 
 type ServiceOptions struct {
 	extras  *extrasOptions
@@ -50,7 +52,7 @@ type extrasOptions struct {
 	healthChkFn HealthChkFn
 }
 
-func NewWithWouter(opts ...func(*RouterOptions)) (*Service, error) {
+func New(opts ...func(*RouterOptions)) (*Service, error) {
 	svc := &Service{}
 	svc.initWithDefaults()
 
@@ -79,7 +81,7 @@ func NewWithWouter(opts ...func(*RouterOptions)) (*Service, error) {
 	svc.service = s
 
 	// Mux Router config
-	router := svc.getRouter()
+	router := svc.buildRouter()
 
 	//// routes initialization
 	if err := opt.initRoutesFn(svc.service.Ctx, router); err != nil {
@@ -105,9 +107,11 @@ func NewWithServiceContainer(opts ...func(*ServiceOptions)) (*Service, error) {
 	}
 	svc.service = opt.service
 	// Mux Router config
-	router := svc.getRouter()
+	router := svc.buildRouter()
 	// add health check handler if provided
-	svc.initHealthCheckFn(opt.extras.healthChkFn, router)
+	if opt.extras.healthChkFn != nil {
+		svc.initHealthCheckFn(opt.extras.healthChkFn, router)
+	}
 	return svc, nil
 }
 
@@ -172,17 +176,52 @@ func (s *Service) metadataHandler(w http.ResponseWriter, _ *http.Request) {
 	WriteJSONBody(b, s.service.Metadata(), http.StatusOK, `{error:"error getting metadata"}`, w)
 }
 
+func (s *Service) initHealthCheckFn(h HealthChkFn, r *mux.Router) {
+	s.healthCheckFunc = h
+	r.HandleFunc("/health", s.healthCheckHandler)
+}
+
+func (s *Service) buildRouter() (r *mux.Router) {
+	// Mux Router config
+	r = mux.NewRouter()
+	//// setting middlewares
+	rf := RecoveryFunc{StackLevel: StackLevelFullStack}
+	r.Use(rf.TryToRecover())
+	r.Use(obs.GetLoggingMiddleware)
+	s.service.OtelProvider.InstrRouter(s.service.Name, r)
+	if env.AsBool("metadata.enabled", false) {
+		r.HandleFunc("/meta", s.metadataHandler)
+	}
+	s.server = &http.Server{
+		WriteTimeout: time.Second * 15,
+		ReadTimeout:  time.Second * 15,
+		IdleTimeout:  time.Second * 60,
+		Handler:      http.TimeoutHandler(r, time.Second, ""),
+	}
+	return
+}
+
+func (s *Service) initWithDefaults() {
+	s.pool = &sync.Pool{
+		New: func() interface{} {
+			return bytes.NewBuffer(make([]byte, 0, 1024))
+		},
+	}
+}
+
 // Setters
 func WithInitRoutesFn(i initRoutesFn) func(*RouterOptions) {
 	return func(w *RouterOptions) {
 		w.initRoutesFn = i
 	}
 }
+
 func WithAddr(a *string) func(*RouterOptions) {
 	return func(r *RouterOptions) {
 		r.addr = a
 	}
 }
+
 func WithName(n string) func(*RouterOptions) {
 	return func(r *RouterOptions) {
 		r.name = n
@@ -209,42 +248,5 @@ func WithHealthCheck[T *ServiceOptions | *RouterOptions](healthChkFn HealthChkFn
 func WithContainer(svc *service.Service) func(*ServiceOptions) {
 	return func(opts *ServiceOptions) {
 		opts.service = svc
-	}
-}
-
-func (s *Service) initHealthCheckFn(h HealthChkFn, r *mux.Router) {
-	s.healthCheckFunc = h
-	r.HandleFunc("/health", s.healthCheckHandler)
-}
-
-func (s *Service) setServer(r *mux.Router) {
-	s.server = &http.Server{
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
-		Handler:      r,
-	}
-}
-
-func (s *Service) getRouter() (r *mux.Router) {
-	// Mux Router config
-	r = mux.NewRouter()
-	//// setting middlewares
-	rf := RecoveryFunc{StackLevel: StackLevelFullStack}
-	r.Use(rf.TryToRecover())
-	r.Use(obs.GetLoggingMiddleware)
-	s.service.OtelProvider.InstrRouter(s.service.Name, r)
-	if env.AsBool("metadata.enabled", false) {
-		r.HandleFunc("/meta", s.metadataHandler)
-	}
-	s.setServer(r)
-	return
-}
-
-func (s *Service) initWithDefaults() {
-	s.pool = &sync.Pool{
-		New: func() interface{} {
-			return bytes.NewBuffer(make([]byte, 0, 1024))
-		},
 	}
 }

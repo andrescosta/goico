@@ -6,17 +6,20 @@ import (
 )
 
 // parse --env:key=value or -env:key=value
-func setEnvsUsingCommandLineArgs() {
-	load(os.Args[1:])
+func setEnvsUsingCommandLineArgs() error {
+	return load(os.Args[1:])
 }
 
-func load(args []string) {
+func load(args []string) error {
 	if len(args) > 0 {
 		m := parse(args)
 		for k, v := range m {
-			os.Setenv(k, v)
+			if err := os.Setenv(k, v); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func parse(args []string) map[string]string {

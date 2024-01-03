@@ -26,9 +26,11 @@ func NewHelthCheckClient(ctx context.Context, addr string) (*HelthCheckClient, e
 		client:     client,
 	}, nil
 }
+
 func (c *HelthCheckClient) Close() {
-	c.conn.Close()
+	_ = c.conn.Close()
 }
+
 func (c *HelthCheckClient) Check(ctx context.Context, name string) (healthpb.HealthCheckResponse_ServingStatus, error) {
 	r, err := c.client.Check(ctx, &healthpb.HealthCheckRequest{Service: name})
 	if err != nil {

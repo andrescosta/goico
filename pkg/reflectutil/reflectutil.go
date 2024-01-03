@@ -16,6 +16,7 @@ func GetFieldUInt[T any](q T, field string) uint64 {
 	u := reflect.ValueOf(q).Elem().FieldByName(field).Uint()
 	return u
 }
+
 func GetFieldString[T any](q T, field string) string {
 	u := reflect.ValueOf(q).Elem().FieldByName(field).String()
 	return u

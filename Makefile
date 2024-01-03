@@ -1,16 +1,31 @@
-GOFMT_FILES = $(shell find . -type f -name '*.go' -not -path "*.pb.go")
+FORMAT_FILES = $(shell find . -type f -name '*.go' -not -path "*.pb.go")
+
+MKDIR_REPO_CMD = mkdir -p reports 
+ifeq ($(OS),Windows_NT)
+ifneq ($(MSYSTEM), MSYS)
+# -new-item exit with an error if "-Force" is not passed and the directory exists. 
+	MKDIR_REPO_CMD = pwsh -noprofile -command "new-item reports -ItemType Directory -Force -ErrorAction silentlycontinue | Out-Null"
+endif
+endif
+
+.PHONY: init gosec lint vuln release format $(FORMAT_FILES)
 
 lint:
-	golangci-lint run ./...
+	@golangci-lint run ./...
 
 vuln:
-	govulncheck ./...
+	@govulncheck ./...
 
-gofmt: $(GOFMT_FILES)  
+gosec: init
+	@gosec -quiet -out ./reports/gosec.txt ./... 
 
-$(GOFMT_FILES):
-	@gofmt -s -w $@
 
-release: gofmt lint vuln 
+format: $(FORMAT_FILES)  
 
-.PHONY: lint vuln release gofmt $(GOFMT_FILES)
+$(FORMAT_FILES):
+	@gofumpt -w $@
+
+init:
+	@$(MKDIR_REPO_CMD) 
+
+release: format lint vuln gosec

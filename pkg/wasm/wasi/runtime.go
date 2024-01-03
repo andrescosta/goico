@@ -12,8 +12,7 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-type Runtime struct {
-}
+type Runtime struct{}
 
 func New(ctx context.Context) (*Runtime, error) {
 	r := wazero.NewRuntime(ctx)
