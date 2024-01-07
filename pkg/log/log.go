@@ -42,26 +42,26 @@ func New() *zerolog.Logger {
 func NewWithContext(ctxInfo map[string]string) *zerolog.Logger {
 	cfg := config{
 		console: console{
-			Enabled:          env.AsBool("log.console.enabled", true),
-			ExcludeTimestamp: env.AsBool("log.console.exclude.timestamp", false),
+			Enabled:          env.Bool("log.console.enabled", true),
+			ExcludeTimestamp: env.Bool("log.console.exclude.timestamp", false),
 		},
-		Level:  env.AsInt("log.level", zerolog.InfoLevel),
-		Caller: env.AsBool("log.caller", false),
+		Level:  env.Int("log.level", zerolog.InfoLevel),
+		Caller: env.Bool("log.caller", false),
 		file: file{
-			Enabled:          env.AsBool("log.file.enabled", false),
-			EncodeLogsAsJSON: env.AsBool("log.file.JSON", false),
+			Enabled:          env.Bool("log.file.enabled", false),
+			EncodeLogsAsJSON: env.Bool("log.file.JSON", false),
 			Name:             getFileName(),
-			MaxSize:          env.AsInt("log.file.max.size", 100),
-			MaxBackups:       env.AsInt("log.file.max.backups", 10),
-			MaxAge:           env.AsInt("log.file.max.age", 24),
+			MaxSize:          env.Int("log.file.max.size", 100),
+			MaxBackups:       env.Int("log.file.max.backups", 10),
+			MaxAge:           env.Int("log.file.max.age", 24),
 		},
 	}
 	return newLogger(ctxInfo, cfg)
 }
 
 func getFileName() (name string) {
-	name = env.Env("log.file.name", "file.log")
-	name = strings.Replace(name, "{workdir}", env.WorkDir(), 1)
+	name = env.String("log.file.name", "file.log")
+	name = strings.Replace(name, "${workdir}", env.WorkDir(), 1)
 	return
 }
 

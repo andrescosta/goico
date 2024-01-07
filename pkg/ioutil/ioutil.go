@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -13,6 +14,11 @@ import (
 	"sort"
 	"strings"
 )
+
+type file struct {
+	fullName string
+	entry    os.DirEntry
+}
 
 func WriteToRandomFile(path, preffix, suffix string, data []byte) (string, error) {
 	path = filepath.Clean(path)
@@ -25,7 +31,7 @@ func WriteToRandomFile(path, preffix, suffix string, data []byte) (string, error
 	}
 	fn = filepath.Clean(fn)
 	fullpath := filepath.Join(path, fn)
-	if err := Write(fullpath, data); err != nil {
+	if err := write(fullpath, data); err != nil {
 		return "", err
 	}
 	return fullpath, nil
@@ -42,52 +48,15 @@ func FileExists(fullPath string) (bool, error) {
 	return true, nil
 }
 
-func CreateEmptyIfNotExists(fullpath string) error {
+func Touch(fullpath string) error {
 	e, err := FileExists(fullpath)
 	if err != nil {
 		return err
 	}
 	if !e {
-		return Write(fullpath, []byte(""))
+		return write(fullpath, []byte(""))
 	}
 	return nil
-}
-
-func Write(file string, data []byte) (errr error) {
-	file = filepath.Clean(file)
-	f, err := os.Create(file)
-	if err != nil {
-		errr = errors.Join(errors.New("error creating file"), err)
-		return
-	}
-	defer func() {
-		err := f.Close()
-		if err != nil {
-			errr = errors.Join(errors.New("error closing the file"), err)
-		}
-	}()
-	w := bufio.NewWriter(f)
-	if _, err := w.Write(data); err != nil {
-		errr = errors.Join(errors.New("error writing file"), err)
-		return
-	}
-	if err := w.Flush(); err != nil {
-		errr = errors.Join(errors.New("error flushing data"), err)
-		return
-	}
-	return
-}
-
-func Subdirs(path string) ([]string, error) {
-	dires, err := os.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
-	dirs := make([]string, 0)
-	for _, d := range dires {
-		dirs = append(dirs, d.Name())
-	}
-	return dirs, nil
 }
 
 func Files(path string) ([]os.DirEntry, error) {
@@ -107,13 +76,10 @@ func Dirs(pathDir string) ([]os.DirEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(f) == 0 {
-		return f, nil
-	}
 	return f, nil
 }
 
-func OldestFile(path, preffix, suffix string) ([]byte, *string, error) {
+func ReadOldestFile(path, preffix, suffix string) ([]byte, *string, error) {
 	files, err := topNfilesSorted(path, preffix, suffix, 1)
 	if err != nil {
 		return nil, nil, err
@@ -121,13 +87,11 @@ func OldestFile(path, preffix, suffix string) ([]byte, *string, error) {
 	if len(files) == 0 {
 		return nil, nil, nil
 	}
-	filename := filepath.Join(path, files[0].Name())
-	filename = filepath.Clean(filename)
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(files[0].fullName)
 	if err != nil {
 		return nil, nil, err
 	}
-	return data, &filename, nil
+	return data, &files[0].fullName, nil
 }
 
 func LastLines(file string, nlines int, skipEmpty bool, noincludecrlf bool) ([]string, error) {
@@ -150,6 +114,7 @@ func LastLines(file string, nlines int, skipEmpty bool, noincludecrlf bool) ([]s
 	buffer := make([]byte, bufferSize)
 	accLines := make([]string, 0)
 	currLine := ""
+	firstCharacter := true
 loop:
 	for {
 		newOffset, err := fileHandle.Seek(cursor, io.SeekEnd)
@@ -162,12 +127,18 @@ loop:
 		}
 		for i := bytesRead - 1; i >= 0; i-- {
 			if buffer[i] == '\n' || buffer[i] == '\r' {
-				// not a new line because line break is CRLF(\r\n),
-				if currLine != "\n" {
+				// if the previous character was \n and the new one is \r,
+				// we skip the line.
+				if currLine != "\n" || buffer[i] == '\n' {
 					appendLine := true
-					if skipEmpty {
-						if strings.TrimSpace(currLine) == "" {
-							appendLine = false
+					if firstCharacter {
+						firstCharacter = false
+						appendLine = false
+					} else {
+						if skipEmpty {
+							if strings.TrimSpace(currLine) == "" {
+								appendLine = false
+							}
 						}
 					}
 					if appendLine {
@@ -201,8 +172,33 @@ loop:
 	return accLines, nil
 }
 
-func filesSorted(path string, preffix, suffix string) ([]os.DirEntry, error) {
-	var files []fs.DirEntry
+func write(file string, data []byte) (errr error) {
+	file = filepath.Clean(file)
+	f, err := os.Create(file)
+	if err != nil {
+		errr = errors.Join(errors.New("error creating file"), err)
+		return
+	}
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			errr = errors.Join(errors.New("error closing the file"), err)
+		}
+	}()
+	w := bufio.NewWriter(f)
+	if _, err := w.Write(data); err != nil {
+		errr = errors.Join(errors.New("error writing file"), err)
+		return
+	}
+	if err := w.Flush(); err != nil {
+		errr = errors.Join(errors.New("error flushing data"), err)
+		return
+	}
+	return
+}
+
+func filesSorted(path string, preffix, suffix string) ([]file, error) {
+	var files []file
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return files, nil
 	}
@@ -211,7 +207,7 @@ func filesSorted(path string, preffix, suffix string) ([]os.DirEntry, error) {
 			return err
 		}
 		if strings.HasPrefix(d.Name(), preffix) && strings.HasSuffix(d.Name(), suffix) {
-			files = append(files, d)
+			files = append(files, file{path, d})
 		}
 		return nil
 	})
@@ -219,8 +215,10 @@ func filesSorted(path string, preffix, suffix string) ([]os.DirEntry, error) {
 		return nil, errors.Join(errors.New("error getting files"), err)
 	}
 	sort.Slice(files, func(i, j int) bool {
-		in1, _ := files[i].Info()
-		in2, _ := files[j].Info()
+		in1, _ := files[i].entry.Info()
+		in2, _ := files[j].entry.Info()
+		fmt.Printf("%s-%d\n", in1.Name(), in1.ModTime().Unix())
+		fmt.Printf("%s-%d\n", in2.Name(), in2.ModTime().Unix())
 		return in1.ModTime().Unix() < in2.ModTime().Unix()
 	})
 	return files, nil
@@ -251,7 +249,7 @@ func files(pathFiles string, filter func(string, fs.DirEntry) bool) ([]os.DirEnt
 	return files, nil
 }
 
-func topNfilesSorted(path, preffix, suffix string, n int) ([]os.DirEntry, error) {
+func topNfilesSorted(path, preffix, suffix string, n int) ([]file, error) {
 	files, err := filesSorted(path, preffix, suffix)
 	if err != nil {
 		return nil, err
