@@ -24,15 +24,27 @@ type (
 		ExcludeTimestamp bool
 	}
 	file struct {
-		Enabled          bool
-		EncodeLogsAsJSON bool
-		Directory        string
-		Name             string
-		MaxSize          int
-		MaxBackups       int
-		MaxAge           int
+		Enabled    bool
+		Directory  string
+		Name       string
+		MaxSize    int
+		MaxBackups int
+		MaxAge     int
 	}
 )
+
+var writer *lumberjack.Logger = nil
+
+func Close() error {
+	if writer != nil {
+		return writer.Close()
+	}
+	return nil
+}
+
+func Luberjack() *lumberjack.Logger {
+	return writer
+}
 
 func New() *zerolog.Logger {
 	var empty map[string]string
@@ -48,12 +60,11 @@ func NewWithContext(ctxInfo map[string]string) *zerolog.Logger {
 		Level:  env.Int("log.level", zerolog.InfoLevel),
 		Caller: env.Bool("log.caller", false),
 		file: file{
-			Enabled:          env.Bool("log.file.enabled", false),
-			EncodeLogsAsJSON: env.Bool("log.file.JSON", false),
-			Name:             getFileName(),
-			MaxSize:          env.Int("log.file.max.size", 100),
-			MaxBackups:       env.Int("log.file.max.backups", 10),
-			MaxAge:           env.Int("log.file.max.age", 24),
+			Enabled:    env.Bool("log.file.enabled", false),
+			Name:       getFileName(),
+			MaxSize:    env.Int("log.file.max.size", 100),
+			MaxBackups: env.Int("log.file.max.backups", 10),
+			MaxAge:     env.Int("log.file.max.age", 24),
 		},
 	}
 	return newLogger(ctxInfo, cfg)
@@ -71,7 +82,8 @@ func newLogger(ctxInfo map[string]string, cfg config) *zerolog.Logger {
 		writers = append(writers, configureLogToConsole(cfg.console))
 	}
 	if cfg.file.Enabled && strings.TrimSpace(cfg.file.Name) != "" {
-		writers = append(writers, configureLogToFile(cfg.file))
+		setLogToFile(cfg.file)
+		writers = append(writers, writer)
 	}
 	level := cfg.Level
 	if len(writers) == 0 {
@@ -92,8 +104,8 @@ func newLogger(ctxInfo map[string]string, cfg config) *zerolog.Logger {
 	return &logger
 }
 
-func configureLogToConsole(cfg console) (writer io.Writer) {
-	writer = zerolog.NewConsoleWriter(
+func configureLogToConsole(cfg console) (writerc io.Writer) {
+	writerc = zerolog.NewConsoleWriter(
 		func(w *zerolog.ConsoleWriter) {
 			w.Out = os.Stdout
 			w.TimeFormat = time.RFC3339
@@ -105,16 +117,16 @@ func configureLogToConsole(cfg console) (writer io.Writer) {
 	return
 }
 
-func configureLogToFile(cfg file) (writer io.Writer) {
-	return configureLumberjack(cfg)
+func setLogToFile(cfg file) {
+	setLumberjack(cfg)
 }
 
-func configureLumberjack(cfg file) (writer io.Writer) {
+func setLumberjack(cfg file) {
 	writer = &lumberjack.Logger{
 		Filename:   cfg.Name,
 		MaxBackups: cfg.MaxBackups,
 		MaxSize:    cfg.MaxSize,
 		MaxAge:     cfg.MaxAge,
 	}
-	return
+
 }

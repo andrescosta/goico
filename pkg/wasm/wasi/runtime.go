@@ -14,6 +14,7 @@ import (
 
 type Runtime struct{}
 
+// experimental: not used
 func New(ctx context.Context) (*Runtime, error) {
 	r := wazero.NewRuntime(ctx)
 
