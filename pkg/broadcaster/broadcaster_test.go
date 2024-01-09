@@ -24,26 +24,27 @@ func TestBroadcasters(t *testing.T) {
 		id:   1,
 	}
 	b := Start[data](context.Background())
-	var w sync.WaitGroup
+	maxListeners := 1000
+	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
-	for i := 0; i < 1000; i++ {
-		w.Add(1)
+	for i := 0; i < maxListeners; i++ {
+		waitListeners.Add(1)
 		listener, err := b.Subscribe()
 		if err != nil {
 			t.Errorf("Broadcaster.Subscribe: %s", err)
 			return
 		}
 		go func() {
-			defer w.Done()
+			defer waitListeners.Done()
 			<-waiter
 			timer := time.NewTimer(5 * time.Second)
 			select {
 			case d := <-listener.C:
 				if d.name != newdata.name {
-					t.Errorf("error name expected %s got %s", newdata.name, d.name)
+					t.Errorf("	 %s got %s", newdata.name, d.name)
 				}
 				if d.id != newdata.id {
-					t.Errorf("error id expected %d got %d", newdata.id, d.id)
+					t.Errorf("id expected %d got %d", newdata.id, d.id)
 				}
 			case <-timer.C:
 				t.Error("timeout")
@@ -55,7 +56,7 @@ func TestBroadcasters(t *testing.T) {
 		t.Errorf("Error not expected:%s", err)
 		return
 	}
-	w.Wait()
+	waitListeners.Wait()
 	if err := b.Stop(); err != nil {
 		t.Errorf("Error not expected:%s", err)
 	}
@@ -67,10 +68,11 @@ func TestUnsubscribe(t *testing.T) {
 		id:   1,
 	}
 	b := Start[data](context.Background())
-	var w sync.WaitGroup
-	start := make(chan int)
+	var waitListeners sync.WaitGroup
+	maxListeners := 2000
+	waiter := make(chan struct{})
 	listeners := make([]*Listener[data], 0)
-	for i := 0; i < 200; i++ {
+	for i := 0; i < maxListeners; i++ {
 		listener, err := b.Subscribe()
 		if err != nil {
 			t.Errorf("Broadcaster.Subscribe: %s", err)
@@ -80,41 +82,47 @@ func TestUnsubscribe(t *testing.T) {
 		if tounsusbcribe {
 			listeners = append(listeners, listener)
 		}
-		w.Add(1)
+		waitListeners.Add(1)
 		go func(l *Listener[data], w *sync.WaitGroup, subcribed bool) {
 			defer w.Done()
-			<-start
-			timer := time.NewTimer(4 * time.Second)
+			<-waiter
+			timer := time.NewTimer(1 * time.Second)
 			select {
 			case d, ok := <-l.C:
 				if subcribed && ok {
 					if d.name != newdata.name {
-						t.Errorf("error name expected %s got %s", newdata.name, d.name)
+						t.Errorf("name expected %s got %s", newdata.name, d.name)
 					}
 					if d.id != newdata.id {
-						t.Errorf("error id expected %d got %d", newdata.id, d.id)
+						t.Errorf("id expected %d got %d", newdata.id, d.id)
 					}
 				}
 				if subcribed && !ok {
 					t.Error("the channel was closed")
 				}
+				if !subcribed && ok {
+					t.Error("It was unsubscribed")
+				}
 			case <-timer.C:
+				if !subcribed {
+					return
+				}
 				t.Error("timeout")
 			}
-		}(listener, &w, !tounsusbcribe)
+		}(listener, &waitListeners, !tounsusbcribe)
 	}
-	close(start)
 	for _, l := range listeners {
 		if err := b.Unsubscribe(l); err != nil {
 			t.Errorf("Error not expected:%s", err)
 			return
 		}
 	}
+	close(waiter)
 	if err := b.Write(newdata); err != nil {
 		t.Errorf("Error not expected:%s", err)
 		return
 	}
-	w.Wait()
+	waitListeners.Wait()
 	if err := b.Stop(); err != nil {
 		t.Errorf("Error not expected:%s", err)
 	}
@@ -126,28 +134,29 @@ func TestStopWrite(t *testing.T) {
 		id:   1,
 	}
 	b := Start[data](context.Background())
-	var w sync.WaitGroup
-	start := make(chan int)
-	for i := 0; i < 10; i++ {
+	var waitListeners sync.WaitGroup
+	maxListeners := 10
+	waiter := make(chan struct{})
+	for i := 0; i < maxListeners; i++ {
 		l, err := b.Subscribe()
 		if err != nil {
 			t.Errorf("Broadcaster.Subscribe: %s", err)
 			return
 		}
-		w.Add(1)
+		waitListeners.Add(1)
 		go func(l *Listener[data], w *sync.WaitGroup) {
 			defer w.Done()
-			<-start
+			<-waiter
 			timer := time.NewTimer(1 * time.Millisecond)
 			for {
 				select {
 				case d, ok := <-l.C:
 					if ok {
 						if d.name != newdata.name {
-							t.Errorf("error name expected %s got %s", newdata.name, d.name)
+							t.Errorf("name expected %s got %s", newdata.name, d.name)
 						}
 						if d.id != newdata.id {
-							t.Errorf("error id expected %d got %d", newdata.id, d.id)
+							t.Errorf("id expected %d got %d", newdata.id, d.id)
 						}
 					}
 					return
@@ -156,9 +165,9 @@ func TestStopWrite(t *testing.T) {
 					return
 				}
 			}
-		}(l, &w)
+		}(l, &waitListeners)
 	}
-	close(start)
+	close(waiter)
 	if err := b.Write(newdata); err != nil {
 		t.Errorf("Error not expected:%s", err)
 		return
@@ -167,36 +176,37 @@ func TestStopWrite(t *testing.T) {
 		t.Errorf("Error not expected:%s", err)
 		return
 	}
-	w.Wait()
+	waitListeners.Wait()
 }
 func TestStopWriteSync(t *testing.T) {
 	newdata := data{
 		name: "Customer 1",
 		id:   1,
 	}
+	maxListeners := 1000
 	b := Start[data](context.Background())
-	var w sync.WaitGroup
-	start := make(chan int)
-	for i := 0; i < 10; i++ {
+	var waitListeners sync.WaitGroup
+	waiter := make(chan struct{})
+	for i := 0; i < maxListeners; i++ {
 		l, err := b.Subscribe()
 		if err != nil {
 			t.Errorf("Broadcaster.Subscribe: %s", err)
 			return
 		}
-		w.Add(1)
+		waitListeners.Add(1)
 		go func(l *Listener[data], w *sync.WaitGroup) {
 			defer w.Done()
-			<-start
+			<-waiter
 			timer := time.NewTimer(1 * time.Millisecond)
 			for {
 				select {
 				case d, ok := <-l.C:
 					if ok {
 						if d.name != newdata.name {
-							t.Errorf("error name expected %s got %s", newdata.name, d.name)
+							t.Errorf("name expected %s got %s", newdata.name, d.name)
 						}
 						if d.id != newdata.id {
-							t.Errorf("error id expected %d got %d", newdata.id, d.id)
+							t.Errorf("id expected %d got %d", newdata.id, d.id)
 						}
 					}
 					return
@@ -205,9 +215,9 @@ func TestStopWriteSync(t *testing.T) {
 					return
 				}
 			}
-		}(l, &w)
+		}(l, &waitListeners)
 	}
-	close(start)
+	close(waiter)
 	if err := b.WriteSync(newdata); err != nil {
 		t.Errorf("Error not expected:%s", err)
 		return
@@ -216,7 +226,7 @@ func TestStopWriteSync(t *testing.T) {
 		t.Errorf("Error not expected:%s", err)
 		return
 	}
-	w.Wait()
+	waitListeners.Wait()
 }
 func TestStoppedError(t *testing.T) {
 	newdata := data{
@@ -282,7 +292,7 @@ func TestUnsubscribeUnsubscribe(t *testing.T) {
 
 func TestMultiWriters(t *testing.T) {
 	b := Start[data](context.Background())
-	var w sync.WaitGroup
+	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 20000
 	maxListeners := 10
@@ -290,14 +300,14 @@ func TestMultiWriters(t *testing.T) {
 	finished.Store(false)
 	timeoutTime := 4 * time.Second
 	for i := 0; i < maxListeners; i++ {
-		w.Add(1)
+		waitListeners.Add(1)
 		listener, err := b.Subscribe()
 		if err != nil {
 			t.Errorf("Broadcaster.Subscribe: %s", err)
 			return
 		}
 		go func() {
-			defer w.Done()
+			defer waitListeners.Done()
 			<-waiter
 			recved := 0
 			timer := time.NewTimer(timeoutTime)
@@ -337,7 +347,7 @@ func TestMultiWriters(t *testing.T) {
 		}(i)
 	}
 	finished.Store(true)
-	w.Wait()
+	waitListeners.Wait()
 	if err := b.Stop(); err != nil {
 		t.Errorf("Error not expected:%s", err)
 	}
@@ -346,20 +356,21 @@ func TestMultiWriters(t *testing.T) {
 
 func TestMultiWritersSync(t *testing.T) {
 	b := Start[data](context.Background())
-	var w sync.WaitGroup
+	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
-	maxd := 20
+	maxProducers := 20
+	maxListeners := 1000
 	finished := atomic.Bool{}
 	finished.Store(false)
-	for i := 0; i < 1000; i++ {
-		w.Add(1)
+	for i := 0; i < maxListeners; i++ {
+		waitListeners.Add(1)
 		listener, err := b.Subscribe()
 		if err != nil {
 			t.Errorf("Broadcaster.Subscribe: %s", err)
 			return
 		}
 		go func() {
-			defer w.Done()
+			defer waitListeners.Done()
 			<-waiter
 			n := 0
 			timeoutTime := 4 * time.Second
@@ -372,7 +383,7 @@ func TestMultiWritersSync(t *testing.T) {
 						return
 					}
 					n++
-					if n >= maxd {
+					if n >= maxProducers {
 						return
 					}
 				case <-timer.C:
@@ -387,7 +398,7 @@ func TestMultiWritersSync(t *testing.T) {
 		}()
 	}
 	close(waiter)
-	for i := 0; i < maxd; i++ {
+	for i := 0; i < maxProducers; i++ {
 		go func(id int) {
 			newdata := data{
 				name: "Customer 1",
@@ -400,7 +411,7 @@ func TestMultiWritersSync(t *testing.T) {
 		}(i)
 	}
 	finished.Store(true)
-	w.Wait()
+	waitListeners.Wait()
 	if err := b.Stop(); err != nil {
 		t.Errorf("Error not expected:%s", err)
 	}
@@ -409,20 +420,21 @@ func TestMultiWritersSync(t *testing.T) {
 
 func TestMultiWritersSyncStop(t *testing.T) {
 	b := Start[data](context.Background())
-	var w sync.WaitGroup
+	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
-	maxd := 20
+	maxProducers := 20
+	maxListeners := 1000
 	finished := atomic.Bool{}
 	finished.Store(false)
-	for i := 0; i < 1000; i++ {
-		w.Add(1)
+	for i := 0; i < maxListeners; i++ {
+		waitListeners.Add(1)
 		listener, err := b.Subscribe()
 		if err != nil {
 			t.Errorf("Broadcaster.Subscribe: %s", err)
 			return
 		}
 		go func() {
-			defer w.Done()
+			defer waitListeners.Done()
 			<-waiter
 			n := 0
 			timer := time.NewTimer(4 * time.Second)
@@ -433,7 +445,7 @@ func TestMultiWritersSyncStop(t *testing.T) {
 						return
 					}
 					n++
-					if n >= maxd {
+					if n >= maxProducers {
 						return
 					}
 				case <-timer.C:
@@ -447,12 +459,12 @@ func TestMultiWritersSyncStop(t *testing.T) {
 		}()
 	}
 	close(waiter)
-	stopId := randomInt(t, maxd)
-	ww := sync.WaitGroup{}
-	for i := 0; i < maxd; i++ {
-		ww.Add(1)
+	stopId := randomInt(t, maxProducers)
+	waitProducers := sync.WaitGroup{}
+	for i := 0; i < maxProducers; i++ {
+		waitProducers.Add(1)
 		go func(id int) {
-			defer ww.Done()
+			defer waitProducers.Done()
 			newdata := data{
 				name: "Customer 1",
 				id:   id,
@@ -470,25 +482,26 @@ func TestMultiWritersSyncStop(t *testing.T) {
 		}(i)
 	}
 	finished.Store(true)
-	ww.Wait()
-	w.Wait()
+	waitProducers.Wait()
+	waitListeners.Wait()
 }
 func TestMultiWritersStop(t *testing.T) {
 	b := Start[data](context.Background())
-	var w sync.WaitGroup
+	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
-	maxd := 20
+	maxProducers := 20
+	maxListeners := 1000
 	finished := atomic.Bool{}
 	finished.Store(false)
-	for i := 0; i < 1000; i++ {
-		w.Add(1)
+	for i := 0; i < maxListeners; i++ {
+		waitListeners.Add(1)
 		listener, err := b.Subscribe()
 		if err != nil {
 			t.Errorf("Broadcaster.Subscribe: %s", err)
 			return
 		}
 		go func() {
-			defer w.Done()
+			defer waitListeners.Done()
 			<-waiter
 			n := 0
 			timer := time.NewTimer(4 * time.Second)
@@ -499,7 +512,7 @@ func TestMultiWritersStop(t *testing.T) {
 						return
 					}
 					n++
-					if n >= maxd {
+					if n >= maxProducers {
 						return
 					}
 				case <-timer.C:
@@ -513,12 +526,12 @@ func TestMultiWritersStop(t *testing.T) {
 		}()
 	}
 	close(waiter)
-	stopId := randomInt(t, maxd)
-	ww := sync.WaitGroup{}
-	for i := 0; i < maxd; i++ {
-		ww.Add(1)
+	stopId := randomInt(t, maxProducers)
+	waitProducers := sync.WaitGroup{}
+	for i := 0; i < maxProducers; i++ {
+		waitProducers.Add(1)
 		go func(id int) {
-			defer ww.Done()
+			defer waitProducers.Done()
 			newdata := data{
 				name: "Customer 1",
 				id:   id,
@@ -536,24 +549,22 @@ func TestMultiWritersStop(t *testing.T) {
 		}(i)
 	}
 	finished.Store(true)
-	ww.Wait()
-	w.Wait()
+	waitProducers.Wait()
+	waitListeners.Wait()
 }
 
 func TestMultiWritersUnsubscribe(t *testing.T) {
 	b := Start[data](context.Background())
-	var w sync.WaitGroup
+	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 200
 	maxListeners := 1000
+	maxClosers := 200
 	finished := atomic.Bool{}
 	finished.Store(false)
 	listeners := make([]*listenerSync, maxListeners)
-	group := listenersGroup{
-		ls: listeners,
-	}
 	for i := 0; i < maxListeners; i++ {
-		w.Add(1)
+		waitListeners.Add(1)
 		listener, err := b.Subscribe()
 		listeners[i] = &listenerSync{
 			l: listener,
@@ -564,7 +575,7 @@ func TestMultiWritersUnsubscribe(t *testing.T) {
 			return
 		}
 		go func(listener *Listener[data]) {
-			defer w.Done()
+			defer waitListeners.Done()
 			<-waiter
 			n := 0
 			timer := time.NewTimer(4 * time.Second)
@@ -589,11 +600,11 @@ func TestMultiWritersUnsubscribe(t *testing.T) {
 		}(listener)
 	}
 	close(waiter)
-	wp := sync.WaitGroup{}
+	waitProducers := sync.WaitGroup{}
 	for i := 0; i < maxProducers; i++ {
-		wp.Add(1)
+		waitProducers.Add(1)
 		go func(id int) {
-			defer wp.Done()
+			defer waitProducers.Done()
 			newdata := data{
 				name: "Customer 1",
 				id:   id,
@@ -604,15 +615,15 @@ func TestMultiWritersUnsubscribe(t *testing.T) {
 			}
 		}(i)
 	}
-	for i := 0; i < maxListeners; i++ {
+	for i := 0; i < maxClosers; i++ {
 		go func() {
-			i := randomInt(t, 600)
-			group.stopit(t, i)
+			i := randomInt(t, maxListeners)
+			listeners[i].stopit(t)
 		}()
 	}
 	finished.Store(true)
-	w.Wait()
-	wp.Wait()
+	waitListeners.Wait()
+	waitProducers.Wait()
 	if err := b.Stop(); err != nil {
 		t.Errorf("Error not expected:%s", err)
 	}
@@ -711,10 +722,10 @@ func TestWithTimeoutContext(t *testing.T) {
 						break loop
 					}
 					if d.name != newdata.name {
-						t.Errorf("error name expected %s got %s", newdata.name, d.name)
+						t.Errorf("name expected %s got %s", newdata.name, d.name)
 					}
 					if d.id != newdata.id {
-						t.Errorf("error id expected %d got %d", newdata.id, d.id)
+						t.Errorf("id expected %d got %d", newdata.id, d.id)
 					}
 
 				case <-timer.C:
@@ -749,14 +760,6 @@ func TestWithTimeoutContext(t *testing.T) {
 	w.Wait()
 	ww.Wait()
 	cancel()
-}
-
-type listenersGroup struct {
-	ls []*listenerSync
-}
-
-func (l *listenersGroup) stopit(t *testing.T, i int) {
-	l.ls[i].stopit(t)
 }
 
 type listenerSync struct {

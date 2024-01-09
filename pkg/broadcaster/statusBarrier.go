@@ -17,7 +17,7 @@ func NewStatusBarrier() *statusBarrier {
 	}
 }
 
-func (b *statusBarrier) Enter() {
+func (b *statusBarrier) Entering() {
 	b.mutex.RLock()
 }
 
@@ -25,11 +25,11 @@ func (b *statusBarrier) Out() {
 	b.mutex.RUnlock()
 }
 
-func (b *statusBarrier) EnterForStopping() {
+func (b *statusBarrier) EnteringStoppingArea() {
 	b.mutex.Lock()
 }
 
-func (b *statusBarrier) EndStop() {
+func (b *statusBarrier) OutOfStoppingArea() {
 	b.mutex.Unlock()
 }
 
@@ -41,6 +41,6 @@ func (b *statusBarrier) MarkStarted() {
 	b.started.Store(true)
 }
 
-func (b *statusBarrier) WasStopped() bool {
+func (b *statusBarrier) IsStopped() bool {
 	return !b.started.Load()
 }

@@ -9,6 +9,8 @@ import (
 
 var ErrStopped = errors.New("broadcaster is stopped")
 
+type void struct{}
+
 type Broadcaster[T any] struct {
 	listeners     sync.Map
 	c             chan T
@@ -38,7 +40,6 @@ func Start[T any](ctx context.Context) *Broadcaster[T] {
 	broadcaster.worker.Add(1)
 	go func(b *Broadcaster[T]) {
 		defer func() {
-			close(b.c)
 			b.worker.Done()
 		}()
 		for {
@@ -62,26 +63,33 @@ func Start[T any](ctx context.Context) *Broadcaster[T] {
 }
 
 func (b *Broadcaster[T]) Stop() error {
-	b.statusBarrier.EnterForStopping()
-	defer b.statusBarrier.EndStop()
-	if b.statusBarrier.WasStopped() {
+	b.statusBarrier.EnteringStoppingArea()
+	defer b.statusBarrier.OutOfStoppingArea()
+	if b.statusBarrier.IsStopped() {
 		return ErrStopped
 	}
 	b.cancel()
 	b.worker.Wait()
-	b.listeners.Range(func(k any, c any) bool {
+	b.listeners.Range(func(k any, _ any) bool {
 		k.(*Listener[T]).stop()
 		b.listeners.Delete(k)
 		return true
 	})
+	close(b.c)
 	b.statusBarrier.MarkStopped()
 	return nil
 }
 
 func (b *Broadcaster[T]) Subscribe() (*Listener[T], error) {
-	if b.statusBarrier.WasStopped() {
+	if b.statusBarrier.IsStopped() {
 		return nil, ErrStopped
 	}
+	l := startListener[T]()
+	b.listeners.Store(l, void{})
+	return l, nil
+}
+
+func startListener[T any]() *Listener[T] {
 	m := make(chan T, 1)
 	l := &Listener[T]{
 		C:             m,
@@ -89,14 +97,13 @@ func (b *Broadcaster[T]) Subscribe() (*Listener[T], error) {
 		statusBarrier: NewStatusBarrier(),
 	}
 	l.statusBarrier.MarkStarted()
-	b.listeners.Store(l, m)
-	return l, nil
+	return l
 }
 
 func (b *Broadcaster[T]) Unsubscribe(l *Listener[T]) error {
-	b.statusBarrier.Enter()
+	b.statusBarrier.Entering()
 	defer b.statusBarrier.Out()
-	if b.statusBarrier.WasStopped() {
+	if b.statusBarrier.IsStopped() {
 		return ErrStopped
 	}
 	_, ok := b.listeners.LoadAndDelete(l)
@@ -106,7 +113,7 @@ func (b *Broadcaster[T]) Unsubscribe(l *Listener[T]) error {
 	return nil
 }
 func (b *Broadcaster[T]) IsSubscribed(l *Listener[T]) (bool, error) {
-	if b.statusBarrier.WasStopped() {
+	if b.statusBarrier.IsStopped() {
 		return false, ErrStopped
 	}
 	_, ok := b.listeners.Load(l)
@@ -114,8 +121,8 @@ func (b *Broadcaster[T]) IsSubscribed(l *Listener[T]) (bool, error) {
 }
 
 func (b *Broadcaster[T]) Write(t T) error {
-	b.statusBarrier.Enter()
-	if b.statusBarrier.WasStopped() {
+	b.statusBarrier.Entering()
+	if b.statusBarrier.IsStopped() {
 		return ErrStopped
 	}
 	go func() {
@@ -130,9 +137,9 @@ func (b *Broadcaster[T]) Write(t T) error {
 }
 
 func (b *Broadcaster[T]) WriteSync(t T) error {
-	b.statusBarrier.Enter()
+	b.statusBarrier.Entering()
 	defer b.statusBarrier.Out()
-	if b.statusBarrier.WasStopped() {
+	if b.statusBarrier.IsStopped() {
 		return ErrStopped
 	}
 	ti := time.NewTimer(1 * time.Second)
@@ -144,9 +151,9 @@ func (b *Broadcaster[T]) WriteSync(t T) error {
 }
 
 func (b *Listener[T]) stop() error {
-	b.statusBarrier.EnterForStopping()
-	defer b.statusBarrier.EndStop()
-	if b.statusBarrier.WasStopped() {
+	b.statusBarrier.EnteringStoppingArea()
+	defer b.statusBarrier.OutOfStoppingArea()
+	if b.statusBarrier.IsStopped() {
 		return ErrStopped
 	}
 	close(b.c)
@@ -155,18 +162,15 @@ func (b *Listener[T]) stop() error {
 }
 
 func (b *Listener[T]) write(t T) error {
-	b.statusBarrier.Enter()
-	if b.statusBarrier.WasStopped() {
+	b.statusBarrier.Entering()
+	defer b.statusBarrier.Out()
+	if b.statusBarrier.IsStopped() {
 		return ErrStopped
 	}
-	go func() {
-		defer b.statusBarrier.Out()
-		ti := time.NewTimer(1 * time.Second)
-		select {
-		case b.c <- t:
-		case <-ti.C:
-			break
-		}
-	}()
+	ti := time.NewTimer(1 * time.Second)
+	select {
+	case b.c <- t:
+	case <-ti.C:
+	}
 	return nil
 }
