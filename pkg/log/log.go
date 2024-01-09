@@ -33,7 +33,7 @@ type (
 	}
 )
 
-var writer *lumberjack.Logger = nil
+var writer *lumberjack.Logger
 
 func Close() error {
 	if writer != nil {
@@ -128,5 +128,4 @@ func setLumberjack(cfg file) {
 		MaxSize:    cfg.MaxSize,
 		MaxAge:     cfg.MaxAge,
 	}
-
 }

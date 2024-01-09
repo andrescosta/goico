@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/collection"
 )
 
@@ -39,5 +40,4 @@ func TestUnwrapError(t *testing.T) {
 			t.Errorf("%v not found", er)
 		}
 	}
-
 }

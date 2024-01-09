@@ -2,18 +2,17 @@ package broadcaster
 
 import (
 	"sync"
-	"sync/atomic"
 )
 
 type statusBarrier struct {
 	mutex   *sync.RWMutex
-	started *atomic.Bool
+	started bool
 }
 
-func NewStatusBarrier() *statusBarrier {
+func newStatusBarrier() *statusBarrier {
 	return &statusBarrier{
 		mutex:   &sync.RWMutex{},
-		started: &atomic.Bool{},
+		started: false,
 	}
 }
 
@@ -34,13 +33,13 @@ func (b *statusBarrier) OutOfStoppingArea() {
 }
 
 func (b *statusBarrier) MarkStopped() {
-	b.started.Store(false)
+	b.started = false
 }
 
 func (b *statusBarrier) MarkStarted() {
-	b.started.Store(true)
+	b.started = true
 }
 
 func (b *statusBarrier) IsStopped() bool {
-	return !b.started.Load()
+	return !b.started
 }

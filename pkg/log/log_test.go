@@ -12,13 +12,15 @@ import (
 
 	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/ioutil"
-	. "github.com/andrescosta/goico/pkg/log"
 	"github.com/rs/zerolog"
+
+	//revive:disable-next-line:dot-imports
+	. "github.com/andrescosta/goico/pkg/log"
 )
 
 type (
 	expectedScenario     func(*testing.T, string)
-	expectedScenarioJson func(*testing.T, logLine)
+	expectedScenarioJSON func(*testing.T, logLine)
 )
 
 type logLine struct {
@@ -47,7 +49,7 @@ type (
 		text           string
 		expected       *string
 		expectedFn     expectedScenario
-		expectedFnJson expectedScenarioJson
+		expectedFnJSON expectedScenarioJSON
 	}
 )
 
@@ -149,6 +151,7 @@ func TestLogToFile(t *testing.T) {
 	}
 	execute(t, scenarios, tempDir)
 }
+
 func TestLogToConsole(t *testing.T) {
 	tempDir := t.TempDir()
 	scenarios := []scenario{
@@ -380,9 +383,8 @@ func execute(t *testing.T, scenarios []scenario, tempDir string) {
 					}
 				}()
 				logLine := logLine{}
-				json.NewDecoder(r).Decode(&logLine)
-				if err != nil {
-					t.Errorf("io.ReadAll: %s", err)
+				if err := json.NewDecoder(r).Decode(&logLine); err != nil {
+					t.Errorf("Decode: %s", err)
 					return
 				}
 				if s.expected != nil {
@@ -396,26 +398,28 @@ func execute(t *testing.T, scenarios []scenario, tempDir string) {
 					if logLine.Message != *s.expected {
 						t.Errorf(`expected %s got %s`, *s.expected, logLine.Message)
 					}
-					if s.expectedFnJson != nil {
-						s.expectedFnJson(t, logLine)
+					if s.expectedFnJSON != nil {
+						s.expectedFnJSON(t, logLine)
 					}
 				}
 			}
 		})
 	}
-
 }
+
 func makeBackup() *backup {
 	return &backup{
 		envs:   os.Environ(),
 		stdout: os.Stdout,
 	}
 }
+
 func restoreBackup(b *backup) {
 	os.Clearenv()
 	setEnvs(b.envs, "")
 	os.Stdout = b.stdout
 }
+
 func setEnvs(envs []string, tempDir string) {
 	for _, ss := range envs {
 		sss := strings.Split(ss, "=")
@@ -426,6 +430,7 @@ func setEnvs(envs []string, tempDir string) {
 		os.Setenv(env.BaseDir(), tempDir)
 	}
 }
+
 func buildContextMap(context []string) map[string]string {
 	m := make(map[string]string)
 	for _, c := range context {
@@ -443,12 +448,13 @@ func newScenario(types int,
 	text string,
 	expected string,
 	expectedFn expectedScenario,
-	expexpectedScenarioJson expectedScenarioJson) scenario {
+	expexpectedScenarioJSON expectedScenarioJSON,
+) scenario {
 	var fileName string
 	if types == typeFile {
 		fileName = name + ".log"
 	}
-	var contextmap map[string]string = nil
+	var contextmap map[string]string
 	if context != nil {
 		contextmap = buildContextMap(context)
 	}
@@ -462,21 +468,25 @@ func newScenario(types int,
 		text:           text,
 		expected:       &expected,
 		expectedFn:     expectedFn,
-		expectedFnJson: expexpectedScenarioJson,
+		expectedFnJSON: expexpectedScenarioJSON,
 	}
 }
+
 func newConsoleScenario(name string,
 	envs []string,
 	lvl zerolog.Level,
 	text string,
-	expected string) scenario {
+	expected string,
+) scenario {
 	return newScenario(0, name, envs, nil, lvl, text, expected, nil, nil)
 }
+
 func newFileScenario(name string,
 	envs []string,
 	lvl zerolog.Level,
 	text string,
-	expected string) scenario {
+	expected string,
+) scenario {
 	return newScenario(1, name, envs, nil, lvl, text, expected, nil, nil)
 }
 
@@ -486,31 +496,38 @@ func newConsoleScenarioWithFn(name string,
 	lvl zerolog.Level,
 	text string,
 	expected string,
-	expectedFn expectedScenario) scenario {
+	expectedFn expectedScenario,
+) scenario {
 	return newScenario(0, name, envs, context, lvl, text, expected, expectedFn, nil)
 }
+
 func newConsoleScenarioWithContext(name string,
 	envs []string,
 	context []string,
 	lvl zerolog.Level,
 	text string,
-	expected string) scenario {
+	expected string,
+) scenario {
 	return newScenario(0, name, envs, context, lvl, text, expected, nil, nil)
 }
+
 func newFileScenarioWithFn(name string,
 	envs []string,
 	lvl zerolog.Level,
 	text string,
 	expected string,
-	expectedScenarioJsonFn expectedScenarioJson) scenario {
-	return newScenario(1, name, envs, nil, lvl, text, expected, nil, expectedScenarioJsonFn)
+	expectedScenarioJSONFn expectedScenarioJSON,
+) scenario {
+	return newScenario(1, name, envs, nil, lvl, text, expected, nil, expectedScenarioJSONFn)
 }
+
 func newFileScenarioWithFnAndContext(name string,
 	envs []string,
 	context []string,
 	lvl zerolog.Level,
 	text string,
 	expected string,
-	expectedFn expectedScenarioJson) scenario {
+	expectedFn expectedScenarioJSON,
+) scenario {
 	return newScenario(1, name, envs, context, lvl, text, expected, nil, expectedFn)
 }

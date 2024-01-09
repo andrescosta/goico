@@ -8,13 +8,19 @@ ifneq ($(MSYSTEM), MSYS)
 endif
 endif
 
-.PHONY: init gosec lint vuln release format $(FORMAT_FILES)
+.PHONY: init test testv gosec lint vuln release format $(FORMAT_FILES)
 
 lint:
 	@golangci-lint run ./...
 
 vuln:
 	@govulncheck ./...
+
+test:
+	go test -count=1 -race ./...
+
+testv:
+	go test -count=1 -v -race ./...
 
 gosec: init
 	@gosec -quiet -out ./reports/gosec.txt ./... 
@@ -28,4 +34,4 @@ $(FORMAT_FILES):
 init:
 	@$(MKDIR_REPO_CMD) 
 
-release: format lint vuln gosec
+release: format test lint vuln gosec

@@ -7,20 +7,22 @@ import (
 	"testing"
 
 	"github.com/andrescosta/goico/pkg/collection"
+
+	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/yamlutil"
 )
 
 type queue struct {
-	Id string
+	ID string
 }
 type data struct {
 	Name   string
-	Id     string
+	ID     string
 	Tenant string
 	Queues []queue
 }
 
-var file string = `name: Demo JOB
+var file = `name: Demo JOB
 id: go-demo-job
 tenant: demogo
 queues:
@@ -38,8 +40,8 @@ func TestDecodeFile(t *testing.T) {
 	if err := DecodeFile(fileName, &d); err != nil {
 		t.Fatalf("DecodeFile: %s", err)
 	}
-	if d.Id != "go-demo-job" {
-		t.Errorf("expected go-demo-job got %s ", d.Id)
+	if d.ID != "go-demo-job" {
+		t.Errorf("expected go-demo-job got %s ", d.ID)
 	}
 	if d.Name != "Demo JOB" {
 		t.Errorf("expected Demo JOB got %s ", d.Name)
@@ -52,7 +54,7 @@ func TestDecodeFile(t *testing.T) {
 	}
 	queues := collection.NewSet("queue-default_1", "queue-default_2")
 	for _, q := range d.Queues {
-		if !queues.Has(q.Id) {
+		if !queues.Has(q.ID) {
 			t.Errorf("not found %s", q)
 		}
 	}
@@ -60,7 +62,7 @@ func TestDecodeFile(t *testing.T) {
 
 func TestMarchal(t *testing.T) {
 	do := data{
-		Id:     "id_1",
+		ID:     "id_1",
 		Name:   "name_1",
 		Tenant: "tenant_1",
 		Queues: []queue{{"qid_1"}, {"qid_2"}},
@@ -79,8 +81,8 @@ func TestMarchal(t *testing.T) {
 	if err := DecodeFile(fileName, &d); err != nil {
 		t.Fatalf("DecodeFile: %s", err)
 	}
-	if d.Id != "id_1" {
-		t.Errorf("expected id_1 got %s ", d.Id)
+	if d.ID != "id_1" {
+		t.Errorf("expected id_1 got %s ", d.ID)
 	}
 	if d.Name != "name_1" {
 		t.Errorf("expected name_1 got %s ", d.Name)
@@ -93,7 +95,7 @@ func TestMarchal(t *testing.T) {
 	}
 	queues := collection.NewSet("qid_1", "qid_2")
 	for _, q := range d.Queues {
-		if !queues.Has(q.Id) {
+		if !queues.Has(q.ID) {
 			t.Errorf("not found %s", q)
 		}
 	}
@@ -113,5 +115,4 @@ func TestErrors(t *testing.T) {
 	if err := DecodeFile(fileName, &d); err == nil {
 		t.Errorf("DecodeFile: expected error got <nil>")
 	}
-
 }

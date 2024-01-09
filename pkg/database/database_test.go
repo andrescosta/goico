@@ -13,6 +13,7 @@ import (
 	"sort"
 	"testing"
 
+	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/database"
 )
 
@@ -30,7 +31,7 @@ type (
 		Country string
 	}
 	step interface {
-		execute(*testing.T, *scenario) error
+		execute(*scenario) error
 	}
 	scenario struct {
 		memory []data
@@ -65,7 +66,7 @@ type dataIsDifferentError struct {
 
 var (
 	add            = addStep{}
-	delete         = deleteStep{}
+	deleteit       = deleteStep{}
 	deletenot      = deleteNotStep{}
 	update         = updateStep{}
 	all            = allStep{}
@@ -79,16 +80,17 @@ func TestDatabaseError(t *testing.T) {
 		t.Errorf("expecting path not found got <nil>")
 	}
 }
+
 func TestOperations(t *testing.T) {
 	t.Parallel()
-	scenarios := []scenario{
-		new("add", fillrandomdata, add),
-		new("get", fillrandomdata, add, get),
-		new("delete", fillrandomdata, add, deletenot, notget),
-		new("update", fillrandomdata, add, update, get),
-		new("all", fillrandomdata, fillrandomdata, fillrandomdata, add, all),
-		new("all_del", fillrandomdata, fillrandomdata, add, delete, all),
-		new("all_update", fillrandomdata, fillrandomdata, add, update, all),
+	scenarios := []*scenario{
+		newscenario("add", fillrandomdata, add),
+		newscenario("get", fillrandomdata, add, get),
+		newscenario("delete", fillrandomdata, add, deletenot, notget),
+		newscenario("update", fillrandomdata, add, update, get),
+		newscenario("all", fillrandomdata, fillrandomdata, fillrandomdata, add, all),
+		newscenario("all_del", fillrandomdata, fillrandomdata, add, deleteit, all),
+		newscenario("all_update", fillrandomdata, fillrandomdata, add, update, all),
 	}
 	dbName := filepath.Join(t.TempDir(), "database.md")
 	db, err := Open(dbName)
@@ -110,12 +112,12 @@ func TestOperations(t *testing.T) {
 
 func TestBucketErrors(t *testing.T) {
 	t.Parallel()
-	scenarios := []scenario{
-		new("add", add),
-		new("get", get),
-		new("delete", delete),
-		new("update", update),
-		new("all", all),
+	scenarios := []*scenario{
+		newscenario("add", add),
+		newscenario("get", get),
+		newscenario("delete", deleteit),
+		newscenario("update", update),
+		newscenario("all", all),
 	}
 	dbName := filepath.Join(t.TempDir(), "database-b-error.md")
 	db, err := Open(dbName)
@@ -130,20 +132,21 @@ func TestBucketErrors(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			fillrandomdata.execute(t, &s)
+			_ = fillrandomdata.execute(s)
 			s.executeBucketError(t, db)
 		})
 	}
 }
+
 func TestMarshallerError(t *testing.T) {
 	t.Parallel()
-	scenariosErrors := []scenario{
-		new("add", add),
-		new("get", get),
-		new("update", update),
-		new("all", all),
+	scenariosErrors := []*scenario{
+		newscenario("add", add),
+		newscenario("get", get),
+		newscenario("update", update),
+		newscenario("all", all),
 	}
-	scenariosData := new("data", fillrandomdata, add)
+	scenariosData := newscenario("data", fillrandomdata, add)
 
 	dbName := filepath.Join(t.TempDir(), "database-m-error.md")
 	db, err := Open(dbName)
@@ -170,7 +173,7 @@ func (s *scenario) executeBucketError(t *testing.T, db *Database) {
 	marshaller := BinaryMarshaller[data]{}
 	s.table = NewTable(db, "any", marshaller)
 	for _, step := range s.steps {
-		err := step.execute(t, s)
+		err := step.execute(s)
 		if !errors.As(err, &NoTableError{}) {
 			t.Errorf("expected database.NoTableError got %s", err)
 			return
@@ -180,6 +183,7 @@ func (s *scenario) executeBucketError(t *testing.T, db *Database) {
 		}
 	}
 }
+
 func (s *scenario) executeMarshallerError(t *testing.T, db *Database, tableName string) {
 	marshaller := faultyMarshaller[data]{}
 	table, err := CreateTableIfNotExist(db, tableName, marshaller)
@@ -188,7 +192,7 @@ func (s *scenario) executeMarshallerError(t *testing.T, db *Database, tableName 
 	}
 	s.table = table
 	for _, step := range s.steps {
-		err := step.execute(t, s)
+		err := step.execute(s)
 		if !errors.Is(err, ErrMashal) &&
 			!errors.Is(err, ErrUnmashal) {
 			t.Errorf("expected marshaller error got %s", err)
@@ -205,20 +209,20 @@ func (s *scenario) execute(t *testing.T, db *Database) {
 	}
 	s.table = table
 	for _, step := range s.steps {
-		if err := step.execute(t, s); err != nil {
+		if err := step.execute(s); err != nil {
 			t.Error(err)
 			return
 		}
 	}
 }
 
-func (a fillRandomDataStep) execute(t *testing.T, s *scenario) error {
-	d := randomData(t)
+func (a fillRandomDataStep) execute(s *scenario) error {
+	d := randomData()
 	s.memory = append(s.memory, d)
 	return nil
 }
 
-func (a addStep) execute(t *testing.T, s *scenario) error {
+func (a addStep) execute(s *scenario) error {
 	if len(s.memory) == 0 {
 		return ErrEmptyMemory
 	}
@@ -230,20 +234,20 @@ func (a addStep) execute(t *testing.T, s *scenario) error {
 	return nil
 }
 
-func (u updateStep) execute(t *testing.T, s *scenario) error {
+func (u updateStep) execute(s *scenario) error {
 	if len(s.memory) == 0 {
 		return ErrEmptyMemory
 	}
-	s.memory[0].Name = randomString(t, 8)
-	s.memory[0].Age = randomInt(t, 90)
-	s.memory[0].Addresses[0].City = randomString(t, 10)
+	s.memory[0].Name = randomString(8)
+	s.memory[0].Age = randomInt(90)
+	s.memory[0].Addresses[0].City = randomString(10)
 	if err := s.table.Update(s.memory[0]); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (g getStep) execute(t *testing.T, s *scenario) error {
+func (g getStep) execute(s *scenario) error {
 	if len(s.memory) == 0 {
 		return ErrEmptyMemory
 	}
@@ -257,7 +261,7 @@ func (g getStep) execute(t *testing.T, s *scenario) error {
 	return nil
 }
 
-func (n notgetStep) execute(t *testing.T, s *scenario) error {
+func (n notgetStep) execute(s *scenario) error {
 	if len(s.memory) == 0 {
 		return ErrEmptyMemory
 	}
@@ -271,15 +275,16 @@ func (n notgetStep) execute(t *testing.T, s *scenario) error {
 	return nil
 }
 
-func (d deleteStep) execute(t *testing.T, s *scenario) error {
-	err := deleteNotStep{}.execute(t, s)
+func (d deleteStep) execute(s *scenario) error {
+	err := deleteNotStep{}.execute(s)
 	if err != nil {
 		return err
 	}
 	s.memory = s.memory[1:]
 	return nil
 }
-func (d deleteNotStep) execute(t *testing.T, s *scenario) error {
+
+func (d deleteNotStep) execute(s *scenario) error {
 	if len(s.memory) == 0 {
 		return ErrEmptyMemory
 	}
@@ -290,7 +295,7 @@ func (d deleteNotStep) execute(t *testing.T, s *scenario) error {
 	return nil
 }
 
-func (a allStep) execute(t *testing.T, s *scenario) error {
+func (a allStep) execute(s *scenario) error {
 	data1, err := s.table.All()
 	if err != nil {
 		return err
@@ -306,38 +311,32 @@ func (a allStep) execute(t *testing.T, s *scenario) error {
 	return nil
 }
 
-func (d data) Id() string { return d.Idd }
+func (d data) ID() string { return d.Idd }
 
-func new(name string, steps ...step) scenario {
-	return scenario{name: name, steps: steps}
+func newscenario(name string, steps ...step) *scenario {
+	return &scenario{name: name, steps: steps}
 }
 
-func randomData(t *testing.T) data {
+func randomData() data {
 	return data{
-		Idd:  randomString(t, 10),
-		Name: randomString(t, 12),
-		Age:  randomInt(t, 100),
+		Idd:  randomString(10),
+		Name: randomString(12),
+		Age:  randomInt(100),
 		Addresses: addresses{
-			{randomString(t, 15), randomString(t, 10)},
+			{randomString(15), randomString(10)},
 		},
 	}
 }
 
-func randomString(t *testing.T, size int) string {
+func randomString(size int) string {
 	rb := make([]byte, size)
-	_, err := rand.Read(rb)
-	if err != nil {
-		t.Errorf("rand.Read:%s", err)
-	}
+	_, _ = rand.Read(rb)
 	rs := base64.URLEncoding.EncodeToString(rb)
 	return rs
 }
 
-func randomInt(t *testing.T, max uint64) uint64 {
-	i, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
-	if err != nil {
-		t.Errorf("rand.Int:%s", err)
-	}
+func randomInt(max uint64) uint64 {
+	i, _ := rand.Int(rand.Reader, big.NewInt(int64(max)))
 	return i.Uint64()
 }
 
@@ -364,11 +363,11 @@ func (d dataIsDifferentError) Error() string {
 	return d.message
 }
 
-func (d faultyMarshaller[T]) Marshal(v T) (string, []byte, error) {
+func (d faultyMarshaller[T]) Marshal(_ T) (string, []byte, error) {
 	return "", nil, ErrMashal
 }
 
-func (d faultyMarshaller[T]) Unmarshal(v []byte) (T, error) {
+func (d faultyMarshaller[T]) Unmarshal(_ []byte) (T, error) {
 	var t T
 	return t, ErrUnmashal
 }

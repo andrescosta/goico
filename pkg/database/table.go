@@ -32,6 +32,7 @@ func NewTable[S any](db *Database, name string, marshaler Marshaler[S]) *Table[S
 	}
 	return table
 }
+
 func CreateTableIfNotExist[S any](db *Database, name string, marshaler Marshaler[S]) (*Table[S], error) {
 	table := NewTable(db, name, marshaler)
 	if err := db.db.Update(func(tx *bolt.Tx) error {

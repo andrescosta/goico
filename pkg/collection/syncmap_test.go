@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/collection"
 )
 
@@ -71,5 +72,4 @@ func testMap(t *testing.T, preffix string, m *SyncMap[string, string], w *sync.W
 	if value1 != v2 {
 		t.Errorf("expected %s got %s", v2, value1)
 	}
-
 }

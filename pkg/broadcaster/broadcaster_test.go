@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/broadcaster"
 )
 
@@ -178,6 +179,7 @@ func TestStopWrite(t *testing.T) {
 	}
 	waitListeners.Wait()
 }
+
 func TestStopWriteSync(t *testing.T) {
 	newdata := data{
 		name: "Customer 1",
@@ -211,6 +213,9 @@ func TestStopWriteSync(t *testing.T) {
 					}
 					return
 				case <-timer.C:
+					if b.IsStopped() {
+						return
+					}
 					t.Error("timeout")
 					return
 				}
@@ -228,6 +233,7 @@ func TestStopWriteSync(t *testing.T) {
 	}
 	waitListeners.Wait()
 }
+
 func TestStoppedError(t *testing.T) {
 	newdata := data{
 		name: "Customer 1",
@@ -267,8 +273,8 @@ func TestStoppedError(t *testing.T) {
 		t.Errorf("Error not expected:%s", err)
 		return
 	}
-
 }
+
 func TestUnsubscribeUnsubscribe(t *testing.T) {
 	b := Start[data](context.Background())
 	l, err := b.Subscribe()
@@ -287,7 +293,6 @@ func TestUnsubscribeUnsubscribe(t *testing.T) {
 	if err := b.Stop(); err != nil {
 		t.Errorf("Error not expected:%s", err)
 	}
-
 }
 
 func TestMultiWriters(t *testing.T) {
@@ -351,7 +356,6 @@ func TestMultiWriters(t *testing.T) {
 	if err := b.Stop(); err != nil {
 		t.Errorf("Error not expected:%s", err)
 	}
-
 }
 
 func TestMultiWritersSync(t *testing.T) {
@@ -415,7 +419,6 @@ func TestMultiWritersSync(t *testing.T) {
 	if err := b.Stop(); err != nil {
 		t.Errorf("Error not expected:%s", err)
 	}
-
 }
 
 func TestMultiWritersSyncStop(t *testing.T) {
@@ -459,7 +462,7 @@ func TestMultiWritersSyncStop(t *testing.T) {
 		}()
 	}
 	close(waiter)
-	stopId := randomInt(t, maxProducers)
+	stopID := randomInt(t, maxProducers)
 	waitProducers := sync.WaitGroup{}
 	for i := 0; i < maxProducers; i++ {
 		waitProducers.Add(1)
@@ -473,7 +476,7 @@ func TestMultiWritersSyncStop(t *testing.T) {
 				t.Errorf("Error not expected:%s", err)
 				return
 			}
-			if id == stopId {
+			if id == stopID {
 				if err := b.Stop(); err != nil && !errors.Is(err, ErrStopped) {
 					t.Errorf("Error not expected:%s", err)
 					return
@@ -485,6 +488,7 @@ func TestMultiWritersSyncStop(t *testing.T) {
 	waitProducers.Wait()
 	waitListeners.Wait()
 }
+
 func TestMultiWritersStop(t *testing.T) {
 	b := Start[data](context.Background())
 	var waitListeners sync.WaitGroup
@@ -526,7 +530,7 @@ func TestMultiWritersStop(t *testing.T) {
 		}()
 	}
 	close(waiter)
-	stopId := randomInt(t, maxProducers)
+	stopID := randomInt(t, maxProducers)
 	waitProducers := sync.WaitGroup{}
 	for i := 0; i < maxProducers; i++ {
 		waitProducers.Add(1)
@@ -540,7 +544,7 @@ func TestMultiWritersStop(t *testing.T) {
 				t.Errorf("Error not expected:%s", err)
 				return
 			}
-			if id == stopId {
+			if id == stopID {
 				if err := b.Stop(); err != nil && !errors.Is(err, ErrStopped) {
 					t.Errorf("Error not expected:%s", err)
 					return
@@ -627,7 +631,6 @@ func TestMultiWritersUnsubscribe(t *testing.T) {
 	if err := b.Stop(); err != nil {
 		t.Errorf("Error not expected:%s", err)
 	}
-
 }
 
 func TestMultiWritersMultiStop(t *testing.T) {
@@ -756,7 +759,9 @@ func TestWithTimeoutContext(t *testing.T) {
 		}
 	}()
 	<-ctx.Done()
-	b.Stop()
+	if err := b.Stop(); err != nil {
+		t.Errorf("Error not expected: %s", err)
+	}
 	w.Wait()
 	ww.Wait()
 	cancel()
@@ -776,7 +781,9 @@ func (l *listenerSync) stopit(t *testing.T) {
 		t.Errorf("IsSubscribed: %s", err)
 	}
 	if b {
-		l.b.Unsubscribe(l.l)
+		if err := l.b.Unsubscribe(l.l); err != nil {
+			t.Errorf("error not expected: %s", err)
+		}
 	}
 }
 

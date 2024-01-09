@@ -6,11 +6,10 @@ import (
 )
 
 type Identifiable interface {
-	Id() string
+	ID() string
 }
 
-type BinaryMarshaller[T Identifiable] struct {
-}
+type BinaryMarshaller[T Identifiable] struct{}
 
 func (d BinaryMarshaller[T]) Marshal(v T) (string, []byte, error) {
 	b := bytes.Buffer{}
@@ -19,7 +18,7 @@ func (d BinaryMarshaller[T]) Marshal(v T) (string, []byte, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	return v.Id(), b.Bytes(), nil
+	return v.ID(), b.Bytes(), nil
 }
 
 func (d BinaryMarshaller[T]) Unmarshal(v []byte) (T, error) {

@@ -142,6 +142,7 @@ func WorkDir() string {
 	defaultDir := fmt.Sprint(".", string(os.PathSeparator))
 	return String(WorkDirVar, defaultDir)
 }
+
 func BaseDir() string {
 	defaultDir := fmt.Sprint(".", string(os.PathSeparator))
 	return String(BaseDirVar, defaultDir)

@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/collection"
 )
 
@@ -25,7 +26,7 @@ func TestFunc(t *testing.T) {
 		index int
 		name  string
 	}
-	var values = []data{
+	values := []data{
 		{1, "val1"},
 		{2, "val2"},
 		{3, "val3"},
@@ -49,6 +50,7 @@ func TestFunc(t *testing.T) {
 		}
 	}
 }
+
 func TestDuplicated(t *testing.T) {
 	valuess := []string{"A", "A", "B", "B", "C", "C", "D"}
 	set1s := NewSet(valuess...)

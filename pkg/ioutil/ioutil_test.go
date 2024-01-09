@@ -13,11 +13,12 @@ import (
 	"testing"
 	"time"
 
+	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/ioutil"
 )
 
 // It grants read, write, and execute permissions to the owner and the group
-const defaultPermission = 0770
+const defaultPermission = 0o770
 
 type node struct {
 	name    string
@@ -104,7 +105,9 @@ func TestFileExists(t *testing.T) {
 	if ok {
 		t.Fatalf("The file should not exists: %s ", fileName)
 	}
-	os.WriteFile(fileName, []byte("content"), os.ModeAppend)
+	if err := os.WriteFile(fileName, []byte("content"), os.ModeAppend); err != nil {
+		t.Fatalf("FileExists: %s ", err)
+	}
 	ok, err = FileExists(fileName)
 	if err != nil {
 		t.Fatalf("FileExists: %s ", err)
@@ -129,6 +132,7 @@ func TestTouch(t *testing.T) {
 		t.Fatalf("The file is not empty: %s", c)
 	}
 }
+
 func TestFiles(t *testing.T) {
 	tempDir := t.TempDir()
 	makeTestTree(t, rootTree, tempDir, nil)
@@ -150,7 +154,6 @@ func TestFiles(t *testing.T) {
 			if n.name == des.Name() && !des.IsDir() {
 				return true
 			}
-
 		}
 		return false
 	})
@@ -176,11 +179,11 @@ func TestDirs(t *testing.T) {
 			if n.name == des.Name() && des.IsDir() {
 				return true
 			}
-
 		}
 		return false
 	})
 }
+
 func TestNoDirs(t *testing.T) {
 	tempDir := t.TempDir()
 	makeTestTree(t, rootTreeNoDirs, tempDir, nil)
@@ -192,6 +195,7 @@ func TestNoDirs(t *testing.T) {
 		t.Fatalf("Dirs were found for dir %s", tempDir)
 	}
 }
+
 func TestNoFiles(t *testing.T) {
 	tempDir := t.TempDir()
 	makeTestTree(t, rootTreeNoFiles, tempDir, nil)
@@ -204,6 +208,7 @@ func TestNoFiles(t *testing.T) {
 		t.Fatalf("Files were found for dir %s:", tempDir)
 	}
 }
+
 func TestReadOldestFile(t *testing.T) {
 	tempDir := t.TempDir()
 	makeTestTree(t, rootTree, tempDir, func() { time.Sleep(1 * time.Second) })
@@ -215,12 +220,12 @@ func TestReadOldestFile(t *testing.T) {
 	}
 	if name != n.name {
 		t.Fatalf("ioutil.Files: expecting %s getting %s", n.name, name)
-
 	}
 	if !bytes.Equal(d, []byte(n.name)) {
 		t.Fatalf("ioutil.Files: content is different between %s and %s", n.name, name)
 	}
 }
+
 func TestLastLinesNoLfNoEmpty(t *testing.T) {
 	t.Parallel()
 	f := tempRandomFileName(t)
@@ -242,6 +247,7 @@ func TestLastLinesNoLfNoEmpty(t *testing.T) {
 		t.Fatalf(`Expecting "line7" got %s`, l[2])
 	}
 }
+
 func TestLastLinesNoCrLfNoEmpty(t *testing.T) {
 	t.Parallel()
 	f := tempRandomFileName(t)
@@ -263,6 +269,7 @@ func TestLastLinesNoCrLfNoEmpty(t *testing.T) {
 		t.Fatalf(`Expecting "line7" got %s`, l[2])
 	}
 }
+
 func TestLastLinesSmallerEmpty(t *testing.T) {
 	t.Parallel()
 	f := tempRandomFileName(t)
@@ -306,6 +313,7 @@ func TestLastLinesLfNoEmpty(t *testing.T) {
 		t.Fatalf(`Expecting "line7" got %s`, l[2])
 	}
 }
+
 func TestLastLinesCrLfNoEmpty(t *testing.T) {
 	t.Parallel()
 	f := tempRandomFileName(t)
@@ -327,6 +335,7 @@ func TestLastLinesCrLfNoEmpty(t *testing.T) {
 		t.Fatalf(`Expecting "line7" got %s`, l[2])
 	}
 }
+
 func TestLastLinesSmallerNoEmpty(t *testing.T) {
 	t.Parallel()
 	f := tempRandomFileName(t)
@@ -345,6 +354,7 @@ func TestLastLinesSmallerNoEmpty(t *testing.T) {
 		t.Fatalf(`Expecting "line1" got %s`, l[1])
 	}
 }
+
 func TestLastLinesCrLfEmpty(t *testing.T) {
 	t.Parallel()
 	f := tempRandomFileName(t)
@@ -372,6 +382,7 @@ func TestLastLinesCrLfEmpty(t *testing.T) {
 		t.Fatalf(`Expecting "line1" got %s`, l[4])
 	}
 }
+
 func TestLastLinesLfEmpty(t *testing.T) {
 	t.Parallel()
 	f := tempRandomFileName(t)
@@ -399,6 +410,7 @@ func TestLastLinesLfEmpty(t *testing.T) {
 		t.Fatalf(`Expecting "line1" got %s`, l[4])
 	}
 }
+
 func TestLastLinesNoCrLfEmpty(t *testing.T) {
 	t.Parallel()
 	f := tempRandomFileName(t)
@@ -426,6 +438,7 @@ func TestLastLinesNoCrLfEmpty(t *testing.T) {
 		t.Fatalf(`Expecting "line1" got %s`, l[4])
 	}
 }
+
 func TestLastLinesNoLfEmpty(t *testing.T) {
 	t.Parallel()
 	f := tempRandomFileName(t)
@@ -458,8 +471,8 @@ func tempRandomFileName(t *testing.T) string {
 	t.Helper()
 	tempDir := t.TempDir()
 	return filepath.Join(tempDir, randomEncodedString(t))
-
 }
+
 func randomEncodedString(t *testing.T) string {
 	t.Helper()
 	rb := make([]byte, 5)
@@ -476,7 +489,7 @@ func makeTestTree(t *testing.T, n *node, baseDir string, waiter func()) {
 	if n.entries == nil {
 		err := os.WriteFile(entryName, []byte(n.name), os.ModeAppend)
 		if err != nil {
-			t.Fatalf("ioutil.Touch: Error writting %s: %s", n.name, err)
+			t.Fatalf("ioutil.Touch: Error writing %s: %s", n.name, err)
 		}
 		if waiter != nil {
 			waiter()

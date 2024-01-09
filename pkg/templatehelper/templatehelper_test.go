@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/templatehelper"
 )
 

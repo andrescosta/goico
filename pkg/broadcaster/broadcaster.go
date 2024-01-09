@@ -34,7 +34,7 @@ func Start[T any](ctx context.Context) *Broadcaster[T] {
 		ctx:           ctx1,
 		cancel:        cancel,
 		worker:        &sync.WaitGroup{},
-		statusBarrier: NewStatusBarrier(),
+		statusBarrier: newStatusBarrier(),
 	}
 	broadcaster.statusBarrier.MarkStarted()
 	broadcaster.worker.Add(1)
@@ -71,7 +71,7 @@ func (b *Broadcaster[T]) Stop() error {
 	b.cancel()
 	b.worker.Wait()
 	b.listeners.Range(func(k any, _ any) bool {
-		k.(*Listener[T]).stop()
+		_ = k.(*Listener[T]).stop()
 		b.listeners.Delete(k)
 		return true
 	})
@@ -81,6 +81,8 @@ func (b *Broadcaster[T]) Stop() error {
 }
 
 func (b *Broadcaster[T]) Subscribe() (*Listener[T], error) {
+	b.statusBarrier.Entering()
+	defer b.statusBarrier.Out()
 	if b.statusBarrier.IsStopped() {
 		return nil, ErrStopped
 	}
@@ -94,7 +96,7 @@ func startListener[T any]() *Listener[T] {
 	l := &Listener[T]{
 		C:             m,
 		c:             m,
-		statusBarrier: NewStatusBarrier(),
+		statusBarrier: newStatusBarrier(),
 	}
 	l.statusBarrier.MarkStarted()
 	return l
@@ -112,7 +114,10 @@ func (b *Broadcaster[T]) Unsubscribe(l *Listener[T]) error {
 	}
 	return nil
 }
+
 func (b *Broadcaster[T]) IsSubscribed(l *Listener[T]) (bool, error) {
+	b.statusBarrier.Entering()
+	defer b.statusBarrier.Out()
 	if b.statusBarrier.IsStopped() {
 		return false, ErrStopped
 	}
@@ -159,6 +164,12 @@ func (b *Listener[T]) stop() error {
 	close(b.c)
 	b.statusBarrier.MarkStopped()
 	return nil
+}
+
+func (b *Broadcaster[T]) IsStopped() bool {
+	b.statusBarrier.Entering()
+	defer b.statusBarrier.Out()
+	return b.statusBarrier.IsStopped()
 }
 
 func (b *Listener[T]) write(t T) error {

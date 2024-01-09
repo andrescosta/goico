@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/andrescosta/goico/pkg/collection"
+
+	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/convert"
 )
 

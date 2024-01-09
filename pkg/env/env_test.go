@@ -17,7 +17,7 @@ import (
 
 type envvs []envv
 
-//1 - Test overloading logic
+// 1 - Test overloading logic
 // Combinations:
 //    1.1 Arg, .env
 //    1.2 Arg, locals
@@ -156,72 +156,137 @@ type (
 
 func TestLoad(t *testing.T) {
 	scenarios := []scenario{
-		{"os.Args plus .env", "",
-			[]string{".env"}, argsEqualToDotEnv,
-			argsEqualToDotEnv},
-		{"os.Args plus .env (partial)", "",
+		{
+			"os.Args plus .env", "",
+			[]string{".env"},
+			argsEqualToDotEnv,
+			argsEqualToDotEnv,
+		},
+		{
+			"os.Args plus .env (partial)", "",
 			[]string{".env"},
 			argsLessThanDotEnv,
-			merge(argsLessThanDotEnv, envm[".env"])},
-		{".env for default", "",
-			[]string{".env"}, nil,
-			envm[".env"]},
-		{".env for dev", env.Development,
-			[]string{".env"}, nil,
-			envm[".env"]},
-		{".env for prod ", env.Production,
-			[]string{".env"}, nil,
-			envm[".env"]},
-		{".env for test", env.Test,
-			[]string{".env"}, nil, envm[".env"]},
-		{".env.development", env.Development,
-			[]string{".env.development"}, nil,
-			envm[".env.development"]},
-		{".env.production", env.Production,
-			[]string{".env.production"}, nil,
-			envm[".env.production"]},
-		{".env.test", env.Test,
-			[]string{".env.test"}, nil,
-			envm[".env.test"]},
-		{".env." + serviceName, "",
-			[]string{".env." + serviceName}, nil,
-			envm[".env."+serviceName]},
-		{".env." + serviceName, env.Development,
-			[]string{".env." + serviceName}, nil,
-			envm[".env."+serviceName]},
-		{".env." + serviceName, env.Production,
-			[]string{".env." + serviceName}, nil,
-			envm[".env."+serviceName]},
-		{".env." + serviceName + "plus .env", env.Production,
-			[]string{".env", ".env." + serviceName}, nil,
-			mergeEnvs(".env."+serviceName, ".env")},
-		{".env." + serviceName, env.Test,
-			[]string{".env." + serviceName}, nil,
-			envm[".env."+serviceName]},
-		{".env plus .env.local", env.Development,
-			[]string{".env", ".env.local"}, nil,
-			mergeEnvs(".env.local", ".env")},
-		{".env plus .env.local for test", env.Test, // env.local is loaded in test
-			[]string{".env", ".env.local"}, nil,
-			envm[".env"]},
-		{".env plus .env.development.local", env.Development,
-			[]string{".env", ".env.development.local"}, nil,
-			mergeEnvs(".env.development.local", ".env")},
-		{".env plus .env.production.local", env.Production,
-			[]string{".env", ".env.production.local"}, nil,
-			mergeEnvs(".env.production.local", ".env")},
-		{".env plus .env.test.local", env.Test,
-			[]string{".env", ".env.test.local"}, nil,
-			mergeEnvs(".env.test.local", ".env")},
-		{".env.development plus .env.development.local", env.Development,
-			[]string{".env.development", ".env.development.local"}, nil,
-			mergeEnvs(".env.development.local", ".env.development")},
-		{".env.production plus .env.production.local", env.Production,
-			[]string{".env.production", ".env.production.local"}, nil,
-			mergeEnvs(".env.production.local", ".env.production")},
-		{".env.test plus .env.test.local", env.Test,
-			[]string{".env.test", ".env.test.local"}, nil,
-			mergeEnvs(".env.test.local", ".env.test")},
+			merge(argsLessThanDotEnv, envm[".env"]),
+		},
+		{
+			".env for default", "",
+			[]string{".env"},
+			nil,
+			envm[".env"],
+		},
+		{
+			".env for dev", env.Development,
+			[]string{".env"},
+			nil,
+			envm[".env"],
+		},
+		{
+			".env for prod ", env.Production,
+			[]string{".env"},
+			nil,
+			envm[".env"],
+		},
+		{
+			".env for test", env.Test,
+			[]string{".env"},
+			nil, envm[".env"],
+		},
+		{
+			".env.development", env.Development,
+			[]string{".env.development"},
+			nil,
+			envm[".env.development"],
+		},
+		{
+			".env.production", env.Production,
+			[]string{".env.production"},
+			nil,
+			envm[".env.production"],
+		},
+		{
+			".env.test", env.Test,
+			[]string{".env.test"},
+			nil,
+			envm[".env.test"],
+		},
+		{
+			".env." + serviceName, "",
+			[]string{".env." + serviceName},
+			nil,
+			envm[".env."+serviceName],
+		},
+		{
+			".env." + serviceName, env.Development,
+			[]string{".env." + serviceName},
+			nil,
+			envm[".env."+serviceName],
+		},
+		{
+			".env." + serviceName, env.Production,
+			[]string{".env." + serviceName},
+			nil,
+			envm[".env."+serviceName],
+		},
+		{
+			".env." + serviceName + "plus .env", env.Production,
+			[]string{".env", ".env." + serviceName},
+			nil,
+			mergeEnvs(".env."+serviceName, ".env"),
+		},
+		{
+			".env." + serviceName, env.Test,
+			[]string{".env." + serviceName},
+			nil,
+			envm[".env."+serviceName],
+		},
+		{
+			".env plus .env.local", env.Development,
+			[]string{".env", ".env.local"},
+			nil,
+			mergeEnvs(".env.local", ".env"),
+		},
+		{
+			".env plus .env.local for test", env.Test, // env.local is loaded in test
+			[]string{".env", ".env.local"},
+			nil,
+			envm[".env"],
+		},
+		{
+			".env plus .env.development.local", env.Development,
+			[]string{".env", ".env.development.local"},
+			nil,
+			mergeEnvs(".env.development.local", ".env"),
+		},
+		{
+			".env plus .env.production.local", env.Production,
+			[]string{".env", ".env.production.local"},
+			nil,
+			mergeEnvs(".env.production.local", ".env"),
+		},
+		{
+			".env plus .env.test.local", env.Test,
+			[]string{".env", ".env.test.local"},
+			nil,
+			mergeEnvs(".env.test.local", ".env"),
+		},
+		{
+			".env.development plus .env.development.local", env.Development,
+			[]string{".env.development", ".env.development.local"},
+			nil,
+			mergeEnvs(".env.development.local", ".env.development"),
+		},
+		{
+			".env.production plus .env.production.local", env.Production,
+			[]string{".env.production", ".env.production.local"},
+			nil,
+			mergeEnvs(".env.production.local", ".env.production"),
+		},
+		{
+			".env.test plus .env.test.local", env.Test,
+			[]string{".env.test", ".env.test.local"},
+			nil,
+			mergeEnvs(".env.test.local", ".env.test"),
+		},
 	}
 
 	for _, s := range scenarios {
@@ -250,7 +315,6 @@ func TestLoadErrors(t *testing.T) {
 	if err := env.Load(serviceName); !errors.Is(err, env.ErrNoEnvFileLoaded) {
 		t.Errorf("expected env.ErrNoEnvFileLoaded got %v", err)
 	}
-
 }
 
 func TestDirs(t *testing.T) {
@@ -259,7 +323,7 @@ func TestDirs(t *testing.T) {
 		restoreOsArgsAndEnv(t, b)
 	})
 	tempDir := t.TempDir()
-	initializeDirVars(t, tempDir)
+	initializeDirVars(tempDir)
 	workDir := env.WorkDir()
 	if workDir != tempDir {
 		t.Errorf("work dir is different %s - %s", tempDir, workDir)
@@ -277,13 +341,15 @@ func TestDirs(t *testing.T) {
 
 func TestDefault(t *testing.T) {
 	scenarios := []scenario{
-		{"os.Args plus .env", "",
-			[]string{".env"}, argsEqualToDotEnv, nil},
+		{
+			"os.Args plus .env", "",
+			[]string{".env"},
+			argsEqualToDotEnv, nil,
+		},
 	}
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-
 			initializeScenario(t, s)
 
 			if err := env.Load(serviceName); err != nil {
@@ -317,17 +383,20 @@ func TestDefault(t *testing.T) {
 					t.Errorf("not expected %s", sav)
 				}
 			}
-
 		})
 	}
 }
+
 func TestInvalid(t *testing.T) {
 	e := envm[".env"]
 	delete(envm, ".env")
 	envm[".env"] = invalids
 	scenarios := []scenario{
-		{".env invalid", "",
-			[]string{".env"}, argsEqualToDotEnv, nil},
+		{
+			".env invalid", "",
+			[]string{".env"},
+			argsEqualToDotEnv, nil,
+		},
 	}
 
 	for _, s := range scenarios {
@@ -336,7 +405,6 @@ func TestInvalid(t *testing.T) {
 			t.Cleanup(func() {
 				delete(envm, ".env")
 				envm[".env"] = e
-
 			})
 			if err := env.Load(serviceName); err != nil {
 				t.Errorf("env.Load: %v", err)
@@ -381,7 +449,7 @@ func initializeScenario(t *testing.T, s scenario) {
 	})
 
 	tempDir := t.TempDir()
-	initializeDirVars(t, tempDir)
+	initializeDirVars(tempDir)
 
 	if s.environment != "" {
 		os.Setenv(env.EnviromentVar, s.environment)
@@ -399,7 +467,7 @@ func initializeScenario(t *testing.T, s scenario) {
 	createEnvFiles(t, tempDir, s.files)
 }
 
-func initializeDirVars(t *testing.T, tempDir string) {
+func initializeDirVars(tempDir string) {
 	os.Setenv(env.BaseDirVar, tempDir)
 	os.Setenv(env.WorkDirVar, tempDir)
 }
@@ -476,7 +544,7 @@ func createEnvFile(t *testing.T, dir string, name string, e envvs) {
 	file := filepath.Join(dir, name)
 	if err := os.WriteFile(file, e.bytes(t),
 		os.ModeAppend); err != nil {
-		t.Fatalf("os.WriteFile: error writting file %s:%s", file, err)
+		t.Fatalf("os.WriteFile: error writing file %s:%s", file, err)
 	}
 }
 
@@ -504,9 +572,11 @@ func (e envv) string() string {
 	}
 	return s
 }
+
 func mergeEnvs(e1 string, e2 string) envvs {
 	return merge(envm[e1], envm[e2])
 }
+
 func merge(e1 envvs, e2 envvs) envvs {
 	es := make(envvs, 0)
 	set := collection.NewSetFn(e1, func(v envv) string { return v.name })

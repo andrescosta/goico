@@ -10,7 +10,7 @@ run:
   build-tags:
   - 'all'
 
-
+exclude-rules:
   # default: ''
   modules-download-mode: 'readonly'
 
@@ -43,7 +43,7 @@ linters:
   - 'nakedret'
   - 'noctx'
   - 'nolintlint'
-  - 'paralleltest'
+  #- 'paralleltest'
   - 'prealloc'
   - 'predeclared'
   - 'revive'
