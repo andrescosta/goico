@@ -13,6 +13,7 @@ func DecodeFile[T any](name string, t *T) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	d := yaml.NewDecoder(f)
 	if err = d.Decode(t); err != nil {
 		return err

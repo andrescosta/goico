@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -15,21 +14,22 @@ import (
 )
 
 const (
-	Development = "development"
-	Production  = "production"
-	Test        = "test"
-	envWorkDir  = "workdir"
-	envBaseDir  = "basedir"
-	fileDefault = ".env"
+	EnviromentVar = "APP_ENV"
+	Development   = "development"
+	Production    = "production"
+	Test          = "test"
+	WorkDirVar    = "workdir"
+	BaseDirVar    = "basedir"
+	fileDefault   = ".env"
 )
 
 var (
-	Environment  = Development
-	Environments = []string{Development, Production, Test}
+	environment  = Development
+	environments = []string{Development, Production, Test}
 )
-var ErrNoEnvFileLoaded = errors.New(".env files were  not found. Configuration was not loaded")
+var ErrNoEnvFileLoaded = errors.New(".env files were not found. Configuration was not loaded")
 
-func Env(key string, defs ...string) string {
+func String(key string, defs ...string) string {
 	s, ok := os.LookupEnv(key)
 	if !ok {
 		return getDefault(defs, "")
@@ -37,7 +37,7 @@ func Env(key string, defs ...string) string {
 	return s
 }
 
-func OrNil(key string) *string {
+func StringOrNil(key string) *string {
 	s, ok := os.LookupEnv(key)
 	if !ok {
 		return nil
@@ -45,14 +45,14 @@ func OrNil(key string) *string {
 	return &s
 }
 
-func AsDuration(key string, values ...time.Duration) *time.Duration {
+func Duration(key string, values ...time.Duration) *time.Duration {
 	def := func(v []time.Duration) *time.Duration {
 		if len(v) == 0 {
 			return nil
 		}
 		return &v[0]
 	}
-	s := OrNil(key)
+	s := StringOrNil(key)
 	if s == nil {
 		return def(values)
 	}
@@ -63,7 +63,7 @@ func AsDuration(key string, values ...time.Duration) *time.Duration {
 	return &r
 }
 
-func AsInt[T ~int | ~int32 | ~int8 | ~int64](key string, value ...T) T {
+func Int[T ~int | ~int32 | ~int8 | ~int64](key string, value ...T) T {
 	s, ok := os.LookupEnv(key)
 	if !ok {
 		return getDefault(value, 0)
@@ -75,7 +75,7 @@ func AsInt[T ~int | ~int32 | ~int8 | ~int64](key string, value ...T) T {
 	return T(v)
 }
 
-func AsBool(key string, value ...bool) bool {
+func Bool(key string, value ...bool) bool {
 	s, ok := os.LookupEnv(key)
 	if !ok {
 		return getDefault(value, false)
@@ -87,8 +87,8 @@ func AsBool(key string, value ...bool) bool {
 	return v
 }
 
-func AsArray(key string, def string) []string {
-	v := Env(key, def)
+func Array(key string, def string) []string {
+	v := String(key, def)
 	return strings.Split(v, ",")
 }
 
@@ -102,45 +102,70 @@ func Load(name string) error {
 	if err := setEnvsUsingCommandLineArgs(); err != nil {
 		return err
 	}
-	Environment = os.Getenv("APP_ENV")
-	if strings.TrimSpace(Environment) == "" {
-		Environment = Development
+	environment = os.Getenv(EnviromentVar)
+	if strings.TrimSpace(environment) == "" {
+		environment = Development
 	} else {
-		if !slices.Contains(Environments, Environment) {
-			return fmt.Errorf("invalid environment %s", Environment)
+		if !slices.Contains(environments, environment) {
+			return fmt.Errorf("invalid environment %s", environment)
 		}
 	}
-
-	if err := loadUsingGoDot(".env." + Environment + ".local"); err == nil {
+	if err := load(true, ".env."+environment+".local"); err == nil {
 		loaded = true
 	}
 
-	if Environment != "test" {
-		if err := loadUsingGoDot(".env.local"); err == nil {
+	if environment != "test" {
+		if err := load(true, ".env.local"); err == nil {
 			loaded = true
 		}
 	}
 
-	if err := loadUsingGoDot(".env." + Environment); err == nil {
+	if err := load(false, ".env."+environment); err == nil {
 		loaded = true
 	}
 
-	if err := loadUsingGoDot(".env." + name); err == nil {
+	if err := load(false, ".env."+name); err == nil {
 		loaded = true
 	}
 
-	if err := loadUsingGoDot(fileDefault); err == nil {
+	if err := load(false, fileDefault); err == nil {
 		loaded = true
 	}
 
 	if !loaded {
 		return ErrNoEnvFileLoaded
 	}
-	// We call it again to override the env values with command line ones
-	if err := setEnvsUsingCommandLineArgs(); err != nil {
-		return err
-	}
 	return nil
+}
+
+func WorkDir() string {
+	defaultDir := fmt.Sprint(".", string(os.PathSeparator))
+	return String(WorkDirVar, defaultDir)
+}
+
+func BaseDir() string {
+	defaultDir := fmt.Sprint(".", string(os.PathSeparator))
+	return String(BaseDirVar, defaultDir)
+}
+
+func ElemInWorkDir(elem ...string) (ret string) {
+	elem = append([]string{WorkDir()}, elem...)
+	ret = filepath.Join(elem...)
+	return
+}
+
+func load(override bool, files ...string) (err error) {
+	for _, f := range files {
+		if override {
+			err = godotenv.Overload(filepath.Join(BaseDir(), f))
+		} else {
+			err = godotenv.Load(filepath.Join(BaseDir(), f))
+		}
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 func getDefault[T any](values []T, default1 T) T {
@@ -148,32 +173,4 @@ func getDefault[T any](values []T, default1 T) T {
 		return default1
 	}
 	return values[0]
-}
-
-func WorkDir() string {
-	return Env(envWorkDir, fmt.Sprint(".", string(os.PathSeparator)))
-}
-
-func InWorkDir(dir ...string) (ret string) {
-	dir = append([]string{WorkDir()}, dir...)
-	ret = path.Join(dir...)
-	return
-}
-
-func BaseDir() string {
-	return Env(envBaseDir, fmt.Sprint(".", string(os.PathSeparator)))
-}
-
-func getDir(dir string) string {
-	return filepath.Join(BaseDir(), dir)
-}
-
-func loadUsingGoDot(files ...string) (err error) {
-	for _, f := range files {
-		err = godotenv.Load(getDir(f))
-		if err != nil {
-			return
-		}
-	}
-	return
 }

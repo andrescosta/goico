@@ -65,7 +65,7 @@ func New(opts ...Setter) (*Service, error) {
 
 	if svc.Addr == nil {
 		addrEnv := svc.Name + ".addr"
-		svc.Addr = env.OrNil(addrEnv)
+		svc.Addr = env.StringOrNil(addrEnv)
 	}
 
 	// metadata info

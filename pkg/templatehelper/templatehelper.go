@@ -8,10 +8,10 @@ import (
 	"unicode/utf8"
 )
 
-func Render(w io.Writer, info string, data any) error {
+func Render(w io.Writer, templ string, data any) error {
 	t := template.New("top")
 	t.Funcs(template.FuncMap{"trim": strings.TrimSpace, "capitalize": capitalize})
-	template.Must(t.Parse(info))
+	template.Must(t.Parse(templ))
 	if err := t.Execute(w, data); err != nil {
 		return err
 	}

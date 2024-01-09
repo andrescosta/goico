@@ -7,10 +7,10 @@ import (
 
 // parse --env:key=value or -env:key=value
 func setEnvsUsingCommandLineArgs() error {
-	return load(os.Args[1:])
+	return setEnvs(os.Args[1:])
 }
 
-func load(args []string) error {
+func setEnvs(args []string) error {
 	if len(args) > 0 {
 		m := parse(args)
 		for k, v := range m {
@@ -33,7 +33,7 @@ func parse(args []string) map[string]string {
 			}
 			continue
 		}
-		v, ok = strings.CutSuffix(arg, "-e:")
+		v, ok = strings.CutPrefix(arg, "-e:")
 		if ok {
 			vs := strings.SplitN(v, "=", 2)
 			if len(vs) < 2 {

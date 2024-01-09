@@ -44,7 +44,7 @@ func New(opts ...func(*Option)) (*Service, error) {
 	s.process = opt.serveHandler
 	addr := opt.addr
 	if addr == "" {
-		addr = env.Env(opt.name+".addr", "")
+		addr = env.String(opt.name+".addr", "")
 	}
 	if addr != "" {
 		// creates an HTTP service to serve metadata and health information

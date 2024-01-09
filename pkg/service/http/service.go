@@ -189,7 +189,7 @@ func (s *Service) buildRouter() (r *mux.Router) {
 	r.Use(rf.TryToRecover())
 	r.Use(obs.GetLoggingMiddleware)
 	s.service.OtelProvider.InstrRouter(s.service.Name, r)
-	if env.AsBool("metadata.enabled", false) {
+	if env.Bool("metadata.enabled", false) {
 		r.HandleFunc("/meta", s.metadataHandler)
 	}
 	s.server = &http.Server{
