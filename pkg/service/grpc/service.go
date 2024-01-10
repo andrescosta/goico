@@ -29,7 +29,7 @@ type grpcOptions struct {
 }
 
 type Service struct {
-	service          *service.Service
+	service          *service.ServiceBase
 	grpcServer       *grpc.Server
 	closeableHandler Closeable
 }

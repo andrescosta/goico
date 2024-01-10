@@ -13,7 +13,7 @@ import (
 type TypeFn func(ctx context.Context) error
 
 type Service struct {
-	service       *service.Service
+	service       *service.ServiceBase
 	process       TypeFn
 	helperService *http.Service
 }
