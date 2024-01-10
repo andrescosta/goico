@@ -17,17 +17,19 @@ type PathHandler struct {
 }
 
 type Service struct {
-	URL    string
-	Client *http.Client
+	URL       string
+	Client    *http.Client
+	Servedone <-chan error
 }
 
-func NewService(ctx context.Context, handlers []PathHandler) (*Service, error) {
+func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthChkFn) (*Service, error) {
 	localhost := "127.0.0.1:0"
 	ch := make(chan string)
 	svc, err := httpsvc.New(
 		httpsvc.WithContext(ctx),
 		httpsvc.WithAddr(&localhost),
 		httpsvc.WithName("listener-test"),
+		httpsvc.WithHealthCheck[*httpsvc.RouterOptions](hfn),
 		httpsvc.WithDoListener[*httpsvc.RouterOptions](func(addr string) (net.Listener, error) {
 			l, err := net.Listen("tcp", addr)
 			a := l.Addr().String()
@@ -51,15 +53,16 @@ func NewService(ctx context.Context, handlers []PathHandler) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	servedone := make(chan error, 1)
 	go func() {
-		if err := svc.Serve(); err != nil {
-			panic(err)
-		}
+		servedone <- svc.Serve()
+		close(servedone)
 	}()
 	addr := <-ch
 	return &Service{
-		URL:    "http://" + addr,
-		Client: &http.Client{Transport: &http.Transport{}},
+		URL:       "http://" + addr,
+		Client:    &http.Client{Transport: &http.Transport{}},
+		Servedone: servedone,
 	}, nil
 }
 

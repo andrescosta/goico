@@ -93,10 +93,10 @@ func (s *ServiceBase) WhenStarted() time.Time {
 
 func (s *ServiceBase) Metadata() map[string]string {
 	m := map[string]string{
-		"Name":       s.Name,
-		"Addr":       *s.Addr,
-		"Start Time": s.WhenStarted().Format(time.UnixDate),
-		"Kind":       s.Kind,
+		"Name":      s.Name,
+		"Addr":      *s.Addr,
+		"StartTime": s.WhenStarted().Format(time.UnixDate),
+		"Kind":      s.Kind,
 	}
 	return m
 }

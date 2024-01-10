@@ -28,8 +28,8 @@ type Service struct {
 }
 
 type healthStatus struct {
-	status  string
-	details map[string]string
+	Status  string            `json:"status"`
+	Details map[string]string `json:"details"`
 }
 
 type (
@@ -168,13 +168,13 @@ func (s *Service) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/JSON")
 	status := &healthStatus{}
 	m, err := s.healthCheckFunc(r.Context())
-	status.details = m
+	status.Details = m
 	var statusCode int
 	if err != nil {
-		status.status = "error"
+		status.Status = "error"
 		statusCode = http.StatusInternalServerError
 	} else {
-		status.status = "alive"
+		status.Status = "alive"
 		statusCode = http.StatusOK
 	}
 	b := s.pool.Get().(*bytes.Buffer)
@@ -254,11 +254,13 @@ func WithContext(ctx context.Context) func(*RouterOptions) {
 
 func WithHealthCheck[T *ServiceOptions | *RouterOptions](healthChkFn HealthChkFn) func(T) {
 	return func(t T) {
-		switch v := any(t).(type) {
-		case *ServiceOptions:
-			v.extras.healthChkFn = healthChkFn
-		case *RouterOptions:
-			v.extras.healthChkFn = healthChkFn
+		if t != nil {
+			switch v := any(t).(type) {
+			case *ServiceOptions:
+				v.extras.healthChkFn = healthChkFn
+			case *RouterOptions:
+				v.extras.healthChkFn = healthChkFn
+			}
 		}
 	}
 }
