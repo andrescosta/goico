@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/http"
 	"github.com/rs/zerolog"
@@ -13,21 +12,30 @@ import (
 type TypeFn func(ctx context.Context) error
 
 type Service struct {
-	service       *service.ServiceBase
-	process       TypeFn
-	helperService *http.Service
+	service        *service.Base
+	process        TypeFn
+	sidecarService *http.Service
 }
 
 type Option struct {
 	serveHandler  TypeFn
-	healthCheckFN http.HealthChkFn
+	healthCheckFN http.HealthCheckFn
 	ctx           context.Context
 	name          string
-	addr          string
+	addr          *string
+	enableSidecar bool
 }
 
+func noop(_ context.Context) error { return nil }
+
 func New(opts ...func(*Option)) (*Service, error) {
-	opt := &Option{}
+	opt := &Option{
+		enableSidecar: true,
+		ctx:           context.Background(),
+		name:          "noop",
+		addr:          nil,
+		serveHandler:  noop,
+	}
 	for _, o := range opts {
 		o(opt)
 	}
@@ -36,37 +44,33 @@ func New(opts ...func(*Option)) (*Service, error) {
 		service.WithName(opt.name),
 		service.WithContext(opt.ctx),
 		service.WithKind("headless"),
+		service.WithAddr(opt.addr),
 	)
 	if err != nil {
 		return nil, err
 	}
 	s.service = service
 	s.process = opt.serveHandler
-	addr := opt.addr
-	if addr == "" {
-		addr = env.String(opt.name+".addr", "")
-	}
-	if addr != "" {
-		// creates an HTTP service to serve metadata and health information
-		// about this headless(no rest or grpc interface) service.
-		h, err := http.NewWithServiceContainer(
-			http.WithContainer(s.service),
-			http.WithHealthCheck[*http.ServiceOptions](opt.healthCheckFN),
+	if opt.enableSidecar {
+		// creates an HTTP service to serve metadata and health information over http
+		h, err := http.NewSidecar(
+			http.WithPrimaryService(s.service),
+			http.WithHealthCheck[*http.SidecarOptions](opt.healthCheckFN),
 		)
 		if err != nil {
 			return nil, err
 		}
-		s.helperService = h
+		s.sidecarService = h
 	}
 	return s, nil
 }
 
 func (s Service) Serve() error {
 	logger := zerolog.Ctx(s.service.Ctx)
-	if s.helperService != nil {
+	if s.sidecarService != nil {
 		logger.Info().Msgf("Starting helper service %d ", os.Getpid())
 		go func() {
-			if err := s.helperService.Serve(); err != nil {
+			if err := s.sidecarService.Serve(); err != nil {
 				logger.Err(err).Msg("error helper service")
 			}
 		}()
@@ -94,13 +98,19 @@ func WithContext(ctx context.Context) func(*Option) {
 	}
 }
 
+func WithEnableSidecar(enableSidecar bool) func(*Option) {
+	return func(h *Option) {
+		h.enableSidecar = enableSidecar
+	}
+}
+
 func WithServeHandler(s func(ctx context.Context) error) func(*Option) {
 	return func(h *Option) {
 		h.serveHandler = s
 	}
 }
 
-func WithAddr(addr string) func(*Option) {
+func WithAddr(addr *string) func(*Option) {
 	return func(h *Option) {
 		h.addr = addr
 	}

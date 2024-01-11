@@ -29,7 +29,7 @@ type grpcOptions struct {
 }
 
 type Service struct {
-	service          *service.ServiceBase
+	service          *service.Base
 	grpcServer       *grpc.Server
 	closeableHandler Closeable
 }
@@ -76,9 +76,9 @@ func New(opts ...func(*grpcOptions)) (*Service, error) {
 	healthpb.RegisterHealthServer(server, healthcheck)
 	svcmeta.RegisterGrpcMetadataServer(server, svcmeta.NewServerInfo(g.Metadata()))
 	g.grpcServer = server
-	healthcheck.SetServingStatus(g.service.Name, healthpb.HealthCheckResponse_SERVING)
+	healthcheck.SetServingStatus(g.service.Name(), healthpb.HealthCheckResponse_SERVING)
 	if opt.healthCheckHandler != nil {
-		go healthcheckIt(g.service.Ctx, g.service.Name, healthcheck, opt.healthCheckHandler)
+		go healthcheckIt(g.service.Ctx, g.service.Name(), healthcheck, opt.healthCheckHandler)
 	}
 	return g, nil
 }

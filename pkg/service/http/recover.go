@@ -42,7 +42,7 @@ func (s *RecoveryFunc) TryToRecover() mux.MiddlewareFunc {
 func (s *RecoveryFunc) logError(ctx context.Context, a any) {
 	logger := zerolog.Ctx(ctx)
 	logger.Error().Msgf("Recovering from fatal error: %v", a)
-	if s.StackLevel == StackLevelFullStack {
+	if s.StackLevel == StackLevelSimple {
 		logger.Error().Msg(string(debug.Stack()))
 	} else {
 		logger.Error().Msg(format(walk()))
