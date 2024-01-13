@@ -23,6 +23,7 @@ type Service struct {
 	server          *http.Server
 	healthCheckFunc HealthCheckFn
 	pool            *sync.Pool
+	imsidecar       bool
 }
 
 type healthStatus struct {
@@ -105,6 +106,7 @@ func NewSidecar(opts ...func(*SidecarOptions)) (*Service, error) {
 		o(opt)
 	}
 	svc.base = opt.base
+	svc.imsidecar = true
 
 	// Mux Router initialization
 	_ = svc.initializeRouter(opt.common)
@@ -136,8 +138,10 @@ func (s *Service) DoServe(listener net.Listener) error {
 		errCh <- s.server.Shutdown(shutdownCtx)
 	}()
 
-	logger.Debug().Msgf("HTTP service: started on %s", *s.base.Addr)
-	s.base.Started()
+	logger.Debug().Msgf("HTTP service: started on %s", listener.Addr().String())
+	if !s.imsidecar {
+		s.base.Started()
+	}
 
 	if err := s.server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("http.Serve: failed to serve: %w", err)

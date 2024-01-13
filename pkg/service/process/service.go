@@ -2,6 +2,8 @@ package process
 
 import (
 	"context"
+	"errors"
+	"net"
 	"os"
 
 	"github.com/andrescosta/goico/pkg/service"
@@ -65,16 +67,22 @@ func New(opts ...func(*Option)) (*Service, error) {
 	return s, nil
 }
 
+func (s Service) ServeWithSidecar(listener net.Listener) error {
+	if s.sidecarService == nil {
+		return errors.New("sidecar not enabled")
+	}
+	logger := zerolog.Ctx(s.base.Ctx)
+	logger.Info().Msgf("Starting helper service %d ", os.Getpid())
+	go func() {
+		if err := s.sidecarService.DoServe(listener); err != nil {
+			logger.Err(err).Msg("error helper service")
+		}
+	}()
+	return s.Serve()
+}
+
 func (s Service) Serve() error {
 	logger := zerolog.Ctx(s.base.Ctx)
-	if s.sidecarService != nil {
-		logger.Info().Msgf("Starting helper service %d ", os.Getpid())
-		go func() {
-			if err := s.sidecarService.Serve(); err != nil {
-				logger.Err(err).Msg("error helper service")
-			}
-		}()
-	}
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
 	s.base.Started()
 	// [process] blocks until the context is closed
@@ -107,6 +115,12 @@ func WithEnableSidecar(enableSidecar bool) func(*Option) {
 func WithServeHandler(s func(ctx context.Context) error) func(*Option) {
 	return func(h *Option) {
 		h.serveHandler = s
+	}
+}
+
+func WithHealthCheckFN(s http.HealthCheckFn) func(*Option) {
+	return func(h *Option) {
+		h.healthCheckFN = s
 	}
 }
 
