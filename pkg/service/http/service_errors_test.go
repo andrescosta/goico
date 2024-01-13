@@ -3,6 +3,7 @@ package http_test
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"testing"
 
@@ -10,6 +11,28 @@ import (
 	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/service/http"
 )
+
+func TestListenNoError(t *testing.T) {
+	localhost := "127.0.0.1:0"
+	ctx, cancel := context.WithCancel(context.Background())
+	svc, err := New(
+		WithContext(ctx),
+		WithAddr(&localhost),
+		WithName("listener-test"),
+	)
+	if err != nil {
+		t.Errorf("not expected error: %v", err)
+	}
+	errch := make(chan error)
+	go func() {
+		errch <- svc.Serve()
+	}()
+	cancel()
+	err = <-errch
+	if err != nil {
+		t.Errorf("not expected error: %v", err)
+	}
+}
 
 func TestInitRouteErrors(t *testing.T) {
 	localhost := "127.0.0.1:0"
@@ -41,13 +64,17 @@ func TestSamePort(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 		return
 	}
+	listener, err := net.Listen("tcp", localhost)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	addr := listener.Addr().String()
 	go func() {
-		if err := svc1.Serve(); err != nil {
+		if err := svc1.DoServe(listener); err != nil {
 			t.Errorf("unexpected error: %v", err)
 			return
 		}
 	}()
-	addr := <-svc1.AddressReady
 	svc2, err := New(
 		WithContext(context.Background()),
 		WithAddr(&addr),

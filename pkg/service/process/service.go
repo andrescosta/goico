@@ -12,7 +12,7 @@ import (
 type TypeFn func(ctx context.Context) error
 
 type Service struct {
-	service        *service.Base
+	base           *service.Base
 	process        TypeFn
 	sidecarService *http.Service
 }
@@ -49,12 +49,12 @@ func New(opts ...func(*Option)) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.service = service
+	s.base = service
 	s.process = opt.serveHandler
 	if opt.enableSidecar {
 		// creates an HTTP service to serve metadata and health information over http
 		h, err := http.NewSidecar(
-			http.WithPrimaryService(s.service),
+			http.WithPrimaryService(s.base),
 			http.WithHealthCheck[*http.SidecarOptions](opt.healthCheckFN),
 		)
 		if err != nil {
@@ -66,7 +66,7 @@ func New(opts ...func(*Option)) (*Service, error) {
 }
 
 func (s Service) Serve() error {
-	logger := zerolog.Ctx(s.service.Ctx)
+	logger := zerolog.Ctx(s.base.Ctx)
 	if s.sidecarService != nil {
 		logger.Info().Msgf("Starting helper service %d ", os.Getpid())
 		go func() {
@@ -76,9 +76,9 @@ func (s Service) Serve() error {
 		}()
 	}
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
-	s.service.Started()
+	s.base.Started()
 	// [process] blocks until the context is closed
-	err := s.process(s.service.Ctx)
+	err := s.process(s.base.Ctx)
 	if err != nil {
 		return err
 	}

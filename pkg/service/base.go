@@ -79,6 +79,10 @@ func (s *Base) Started() {
 	s.meta.StartTime = time.Now()
 }
 
+func (s *Base) Stopped() {
+	s.meta.StartTime = time.Time{}
+}
+
 func (s *Base) Name() string {
 	return s.meta.Name
 }

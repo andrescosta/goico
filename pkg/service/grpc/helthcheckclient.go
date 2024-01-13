@@ -19,9 +19,14 @@ func NewHelthCheckClient(ctx context.Context, addr string) (*HelthCheckClient, e
 	if err != nil {
 		return nil, err
 	}
+	return NewHelthCheckClientWithConn(conn)
+}
+
+func NewHelthCheckClientWithConn(conn *grpc.ClientConn) (*HelthCheckClient, error) {
+	conn.Target()
 	client := healthpb.NewHealthClient(conn)
 	return &HelthCheckClient{
-		serverAddr: addr,
+		serverAddr: conn.Target(),
 		conn:       conn,
 		client:     client,
 	}, nil

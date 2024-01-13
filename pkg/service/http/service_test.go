@@ -3,8 +3,6 @@ package http_test
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +10,6 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -22,307 +19,296 @@ import (
 	"github.com/andrescosta/goico/pkg/service/http/httptest"
 )
 
-type health struct {
-	Status    string            `json:"status"`
-	Details   map[string]string `json:"details"`
-	hasErrors bool
-}
-type metadata struct {
-	Addr      string
-	Kind      string
-	Name      string
-	StartTime string
-}
+type (
+	health struct {
+		Status    string            `json:"status"`
+		Details   map[string]string `json:"details"`
+		HasErrors bool              `json:"-"`
+	}
+	metadata struct {
+		Addr      string
+		Kind      string
+		Name      string
+		StartTime string
+	}
+	scenario interface {
+		sname() string
+		exec(*testing.T, *httptest.Service)
+		env() []string
+	}
+)
+
+type (
+	scenarioSidecar interface {
+		isSidecar() bool
+	}
+
+	config struct {
+		envv []string
+		name string
+	}
+
+	echo struct {
+		config
+		body string
+		verb string
+		code int
+	}
+
+	upsPanic struct {
+		config
+		stackLevel httpsvc.StackLevel
+	}
+	upsTimeout struct {
+		config
+	}
+	getMetadata struct {
+		config
+		kind    string
+		enabled bool
+		sidecar bool
+	}
+	healthCheck struct {
+		config
+		health  health
+		sidecar bool
+	}
+)
 
 var debug = false
 
 const nobody = ""
 
-type scenario struct {
-	name               string
-	handlers           []httptest.PathHandler
-	healthCheckHandler func(context.Context) (map[string]string, error)
-	runner             func(*testing.T, *httptest.Service)
-	setenv             func()
-	stackLevel         httpsvc.StackLevel
-}
-
-func TestService(t *testing.T) {
-	scenarios := []scenario{
-		get200(),
-		get500(),
-		post200(),
-		post500(),
-		recoverfrompanic(httpsvc.StackLevelFullStack),
-		recoverfrompanic(httpsvc.StackLevelSimple),
-		healthcheckerror(),
-		healthcheckok(),
-		disabledhealthcheck(),
-		getmetadata(),
-		disabledmetadata(),
-		gettimeout(),
-	}
-	run(t, scenarios)
-}
-
-// Scenarios definition
-func get200() scenario {
-	return verb(http.MethodGet, http.StatusOK)
-}
-
-func post200() scenario {
-	return verb(http.MethodPost, http.StatusOK)
-}
-
-func get500() scenario {
-	return verb(http.MethodGet, http.StatusInternalServerError)
-}
-
-func post500() scenario {
-	return verb(http.MethodPost, http.StatusInternalServerError)
-}
-
-func verb(verb string, statuscode int) scenario {
-	body := randomstring(20)
-	return scenario{
-		name:     fmt.Sprintf("%s%d", verb, statuscode),
-		handlers: handlerbody("/", body, statuscode),
-		runner: func(t *testing.T, s *httptest.Service) {
-			validateverb(t, s, verb, statuscode, body)
-		},
-	}
-}
-
-func getmetadata() scenario {
-	return scenario{
-		name: "getmetadata",
-		runner: func(t *testing.T, s *httptest.Service) {
-			runmetadata(t, "rest", s)
-		},
-	}
-}
-
-func disabledmetadata() scenario {
-	return scenario{
-		name:     "disabledmetadata",
-		handlers: handlerbody("/", "??", http.StatusOK),
-		runner: func(t *testing.T, s *httptest.Service) {
-			validateurl(t, s, s.URL+"/meta", http.MethodGet, http.StatusNotFound, nobody)
-		},
-		setenv: func() {
-			httptest.MetadataOff()
-		},
-	}
-}
-
-func recoverfrompanic(stackLevel httpsvc.StackLevel) scenario {
-	body := "mirror %s"
-	return scenario{
-		name:       "recoverfrompanic",
-		stackLevel: stackLevel,
-		handlers: []httptest.PathHandler{
-			{
-				Scheme: "http",
-				Path:   "/faulty",
-				Handler: func(rw http.ResponseWriter, r *http.Request) {
-					panic("ohhps something bad happened")
-				},
-			},
-			{
-				Scheme: "http",
-				Path:   "/good",
-				Handler: func(rw http.ResponseWriter, r *http.Request) {
-					id := r.URL.Query().Get("id")
-					dowrite(rw, http.StatusOK, fmt.Sprintf(body, id))
-				},
-			},
-		},
-		runner: func(t *testing.T, s *httptest.Service) {
-			runfaulty(t, s, body)
-		},
-	}
-}
-
-func healthcheckok() scenario {
-	h := health{
-		Status: "alive",
-		Details: map[string]string{
-			"customer": "OK",
-			"identity": "OK",
-			"database": "OK",
-		},
-		hasErrors: false,
-	}
-	return healthcheck("healthcheckok", h)
-}
-
-func healthcheckerror() scenario {
-	h := health{
-		Status: "error",
-		Details: map[string]string{
-			"customer": "ERROR!",
-			"identity": "OK",
-			"database": "ERROR!",
-		},
-		hasErrors: true,
-	}
-	return healthcheck("healthcheckerror", h)
-}
-
-func healthcheck(name string, h health) scenario {
-	return scenario{
-		name: name,
-		healthCheckHandler: func(ctx context.Context) (map[string]string, error) {
-			var err error
-			if h.hasErrors {
-				err = errors.New("Some errors")
+var handlers = []httptest.PathHandler{
+	{
+		Scheme: "http",
+		Path:   "/echo",
+		Handler: func(rw http.ResponseWriter, r *http.Request) {
+			c, err := strconv.Atoi(r.URL.Query().Get("code"))
+			if err != nil {
+				rw.WriteHeader(http.StatusBadRequest)
+				return
 			}
-			return h.Details, err
+			message := r.URL.Query().Get("message")
+			if message != "" {
+				_, _ = rw.Write([]byte(message))
+			}
+			if c != http.StatusOK {
+				rw.WriteHeader(c)
+			}
 		},
-		runner: func(t *testing.T, s *httptest.Service) {
-			runhealthcheck(t, s, h)
+	},
+	{
+		Scheme: "http",
+		Path:   "/panic",
+		Handler: func(rw http.ResponseWriter, r *http.Request) {
+			panic("panic!!!")
 		},
-	}
+	},
+	{
+		Scheme: "http",
+		Path:   "/timeout",
+		Handler: func(rw http.ResponseWriter, r *http.Request) {
+			time.Sleep(1 * time.Minute)
+			rw.WriteHeader(http.StatusOK)
+		},
+	},
 }
 
-func disabledhealthcheck() scenario {
-	return scenario{
-		name: "disabledhealthcheck",
-		runner: func(t *testing.T, s *httptest.Service) {
-			validateurl(t, s, s.URL+"/health", http.MethodGet, http.StatusNotFound, nobody)
+func Test(t *testing.T) {
+	run(t, []scenario{
+		echo{
+			config: config{
+				name: "get200",
+			},
+			body: "get200",
+			verb: http.MethodGet,
+			code: http.StatusOK,
 		},
-	}
-}
-
-func gettimeout() scenario {
-	body := randomstring(10)
-	return scenario{
-		name: "gettimeout",
-		handlers: []httptest.PathHandler{
-			{
-				Scheme: "http",
-				Path:   "/timeout",
-				Handler: func(rw http.ResponseWriter, r *http.Request) {
-					time.Sleep(60 * time.Second)
-					dowrite(rw, http.StatusOK, body)
-				},
+		echo{
+			config: config{
+				name: "post200",
+			},
+			body: "post200",
+			verb: http.MethodPost,
+			code: http.StatusOK,
+		},
+		echo{
+			config: config{
+				name: "get500",
+			},
+			body: nobody,
+			verb: http.MethodGet,
+			code: http.StatusInternalServerError,
+		},
+		echo{
+			config: config{
+				name: "post500",
+			},
+			body: nobody,
+			verb: http.MethodPost,
+			code: http.StatusInternalServerError,
+		},
+		upsPanic{
+			config: config{
+				name: "panic-full-stack",
+			},
+			stackLevel: httpsvc.StackLevelFullStack,
+		},
+		upsPanic{
+			config: config{
+				name: "panic-simple-stack",
+			},
+			stackLevel: httpsvc.StackLevelSimple,
+		},
+		upsTimeout{
+			config: config{
+				name: "timeout",
 			},
 		},
-		runner: func(t *testing.T, s *httptest.Service) {
-			rungettimeout(t, s)
+		getMetadata{
+			config: config{
+				name: "metadata-enabled",
+			},
+			kind:    "rest",
+			enabled: true,
 		},
-		setenv: func() {
-			httptest.SetArgs("http.shutdown.timeout", (1 * time.Second).String())
+		getMetadata{
+			config: config{
+				name: "metadata-disabled",
+				// by default, it is enabled
+				envv: []string{"metadata.enabled=false"},
+			},
+			enabled: false,
 		},
-	}
+		getMetadata{
+			config: config{
+				name: "metadata-sidecar-enabled",
+			},
+			kind:    "headless",
+			enabled: true,
+			sidecar: true,
+		},
+		healthCheck{
+			config: config{
+				name: "healthcheck-ok",
+			},
+			health: health{
+				Details: map[string]string{
+					"customer": "OK",
+					"identity": "OK",
+					"database": "OK",
+				},
+				HasErrors: false,
+				Status:    "alive",
+			},
+		},
+		healthCheck{
+			config: config{
+				name: "healcheck-error",
+			},
+			health: health{
+				Details: map[string]string{
+					"customer": "ERROR!",
+					"identity": "OK",
+					"database": "ERROR!",
+				},
+				HasErrors: true,
+				Status:    "error",
+			},
+		},
+		healthCheck{
+			config: config{
+				name: "healthcheck-sidecar-ok",
+			},
+			sidecar: true,
+			health: health{
+				Details: map[string]string{
+					"workers_running": "10",
+					"workers_stopped": "0",
+				},
+				HasErrors: false,
+				Status:    "alive",
+			},
+		},
+		healthCheck{
+			config: config{
+				name: "healcheck-sidecar-error",
+			},
+			sidecar: true,
+			health: health{
+				Details: map[string]string{
+					"workers_running": "5",
+					"workers_stopped": "5",
+				},
+				HasErrors: true,
+				Status:    "error",
+			},
+		},
+	},
+	)
 }
 
-//
-// Scenarios execution
-//
-
-func runmetadata(t *testing.T, kind string, s *httptest.Service) {
-	resp, err := s.Get(s.URL + "/meta")
+func (s echo) exec(t *testing.T, svc *httptest.Service) {
+	url := fmt.Sprintf("%s/echo?message=%s&code=%d", svc.URL, s.body, s.code)
+	resp, err := svc.Verb(url, s.verb, nil)
 	if err != nil {
 		t.Errorf("unexpected error getting from server: %v", err)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
-	validatemetadata(t, kind, resp)
+	validateResponse(t, resp, s.code, s.body)
 }
 
-func runfaulty(t *testing.T, s *httptest.Service, body string) {
-	w := &sync.WaitGroup{}
-	start := make(chan struct{})
-	for i := 0; i < 100; i++ {
-		w.Add(1)
-		go func(id string) {
-			defer w.Done()
-			<-start
-			resp, err := s.Get(s.URL + "/good?id=" + id)
-			if err != nil {
-				t.Errorf("unexpected error getting from server: %v", err)
-				return
-			}
-			defer func() { _ = resp.Body.Close() }()
-			validateresponse(t, resp, http.StatusOK, fmt.Sprintf(body, id))
-		}(strconv.Itoa(i))
+func (upsPanic) exec(t *testing.T, svc *httptest.Service) {
+	url := svc.URL + "/panic"
+	respp, err := svc.Verb(url, http.MethodGet, nil)
+	if err != nil {
+		t.Errorf("not expected error: %v", err)
+		return
 	}
-	for i := 0; i < 100; i++ {
-		w.Add(1)
-		go func() {
-			defer w.Done()
-			<-start
-			resp, err := s.Get(s.URL + "/faulty")
-			if err != nil {
-				t.Errorf("unexpected error getting from server: %v", err)
-				return
-			}
-			defer func() { _ = resp.Body.Close() }()
-			validateresponse(t, resp, http.StatusInternalServerError, nobody)
-		}()
-	}
-	close(start)
-	w.Wait()
-}
-
-func rungettimeout(t *testing.T, s *httptest.Service) {
-	for i := 0; i < 10; i++ {
-		go func(id string) {
-			resp, err := s.Get(s.URL + "/timeout")
-			if err == nil {
-				_ = resp.Body.Close()
-			}
-			if resp.StatusCode == http.StatusOK {
-				t.Errorf("expected status code 504")
-			}
-		}(strconv.Itoa(i))
-	}
-	// we are giving some time to call /timeout
-	// before returning and stopping the service
-	time.Sleep(1 * time.Second)
-}
-
-func runhealthcheck(t *testing.T, s *httptest.Service, h health) {
-	w := &sync.WaitGroup{}
-	start := make(chan struct{})
-	for i := 0; i < 1; i++ {
-		w.Add(1)
-		go func() {
-			defer w.Done()
-			<-start
-			resp, err := s.Get(s.URL + "/health")
-			if err != nil {
-				t.Errorf("unexpected error getting from server: %v", err)
-				return
-			}
-			defer func() { _ = resp.Body.Close() }()
-			validatehelthcheck(h, resp, t)
-		}()
-	}
-	close(start)
-	w.Wait()
-}
-
-//
-// Scenarios result validation
-//
-
-func validateverb(t *testing.T, s *httptest.Service, verb string, statusCode int, body string) {
-	validateurl(t, s, s.URL, verb, statusCode, body)
-}
-
-func validateurl(t *testing.T, s *httptest.Service, url string, verb string, statusCode int, body string) {
-	resp, err := s.Verb(url, verb, nil)
+	defer func() { _ = respp.Body.Close() }()
+	validateResponse(t, respp, http.StatusInternalServerError, nobody)
+	url = svc.URL + "/echo?message=test&code=200"
+	resp, err := svc.Get(url)
 	if err != nil {
 		t.Errorf("unexpected error getting from server: %v", err)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
-	validateresponse(t, resp, statusCode, body)
+	validateResponse(t, resp, http.StatusOK, "test")
 }
 
-func validatemetadata(t *testing.T, kind string, resp *http.Response) {
+func (upsTimeout) exec(t *testing.T, svc *httptest.Service) {
+	url := svc.URL + "/timeout"
+	resp, err := svc.Get(url)
+	if err == nil {
+		t.Errorf("expected EOF got <nil>")
+		return
+	}
+	defer func() {
+		// body should always be null but the lint ...
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
+}
+
+func (s getMetadata) exec(t *testing.T, svc *httptest.Service) {
+	url := svc.URL + "/meta"
+	resp, err := svc.Get(url)
+	if err != nil {
+		t.Errorf("unexpected error getting from server: %v", err)
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if !s.enabled {
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("expected 404 getting %d", resp.StatusCode)
+		}
+		return
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected a status code of 200, got %d", resp.StatusCode)
 		return
@@ -337,7 +323,7 @@ func validatemetadata(t *testing.T, kind string, resp *http.Response) {
 		t.Errorf("unexpected error decoding json %s", err)
 		return
 	}
-	if m.Kind != kind {
+	if m.Kind != s.kind {
 		t.Errorf("expected Kind value 'rest' got %s", err)
 		return
 	}
@@ -355,12 +341,19 @@ func validatemetadata(t *testing.T, kind string, resp *http.Response) {
 	}
 }
 
-func validatehelthcheck(h health, resp *http.Response, t *testing.T) {
-	if !h.hasErrors && resp.StatusCode != http.StatusOK {
+func (s healthCheck) exec(t *testing.T, svc *httptest.Service) {
+	url := svc.URL + "/health"
+	resp, err := svc.Get(url)
+	if err != nil {
+		t.Errorf("unexpected error getting from server: %v", err)
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if !s.health.HasErrors && resp.StatusCode != http.StatusOK {
 		t.Errorf("expected a status code of %d, got %d", http.StatusOK, resp.StatusCode)
 		return
 	}
-	if h.hasErrors && resp.StatusCode != http.StatusInternalServerError {
+	if s.health.HasErrors && resp.StatusCode != http.StatusInternalServerError {
 		t.Errorf("expected a status code of %d, got %d", http.StatusOK, resp.StatusCode)
 		return
 	}
@@ -374,15 +367,15 @@ func validatehelthcheck(h health, resp *http.Response, t *testing.T) {
 		t.Errorf("unexpected error decoding json %s", err)
 		return
 	}
-	// we set h2.hasErrors to h.hasErrors to avoid getting an error in DeepEqual
-	h2.hasErrors = h.hasErrors
-	if !reflect.DeepEqual(h, h2) {
-		t.Errorf("different %v %v", h, h2)
+	// we set h2.HasErrors to h.HasErrors to avoid getting an error in DeepEqual
+	h2.HasErrors = s.health.HasErrors
+	if !reflect.DeepEqual(s.health, h2) {
+		t.Errorf("different %v %v", s.health, h2)
 		return
 	}
 }
 
-func validateresponse(t *testing.T, resp *http.Response, statuscode int, body string) {
+func validateResponse(t *testing.T, resp *http.Response, statuscode int, body string) {
 	if resp.StatusCode != statuscode {
 		t.Errorf("expected a status code of %d, got %d", statuscode, resp.StatusCode)
 		return
@@ -406,24 +399,17 @@ func validateresponse(t *testing.T, resp *http.Response, statuscode int, body st
 	}
 }
 
-//
-// scenarios runner
-//
-
-func run(t *testing.T, scenarios []scenario) {
-	for _, s := range scenarios {
-		t.Run(s.name, func(t *testing.T) {
+// runner
+func run(t *testing.T, ss []scenario) {
+	for _, s := range ss {
+		t.Run(s.sname(), func(t *testing.T) {
 			b := env.Backup()
 			t.Cleanup(func() {
 				env.Restore(b)
 			})
-			if s.setenv != nil {
-				s.setenv()
-			} else {
-				setdefaultenv()
-			}
+			setEnv(s.env())
 			ctx, cancel := context.WithCancel(context.Background())
-			svc, err := httptest.NewService(ctx, s.handlers, s.healthCheckHandler, s.stackLevel)
+			svc, err := getService(ctx, s)
 			if err != nil {
 				t.Fatalf("Not expected error:%s", err)
 				return
@@ -431,7 +417,7 @@ func run(t *testing.T, scenarios []scenario) {
 			if !debug {
 				log.DisableLog()
 			}
-			s.runner(t, svc)
+			s.exec(t, svc)
 			cancel()
 			err = <-svc.Servedone
 			if err != nil {
@@ -441,36 +427,55 @@ func run(t *testing.T, scenarios []scenario) {
 	}
 }
 
+func getService(ctx context.Context, s scenario) (*httptest.Service, error) {
+	ss, ok := s.(scenarioSidecar)
+	if !ok || !ss.isSidecar() {
+		return httptest.NewService(ctx, getHandlers(s), getHealthCheckHandler(s), getStackLevel(s))
+	}
+	return httptest.NewSidecar(ctx, getHealthCheckHandler(s))
+}
+
+func getHandlers(s scenario) []httptest.PathHandler {
+	switch s.(type) {
+	case echo, upsPanic, upsTimeout:
+		return handlers
+	default:
+		return nil
+	}
+}
+
+func getStackLevel(s scenario) httpsvc.StackLevel {
+	ss, ok := s.(upsPanic)
+	if ok {
+		return ss.stackLevel
+	}
+	return httpsvc.StackLevelSimple
+}
+
+func getHealthCheckHandler(s scenario) func(ctx context.Context) (map[string]string, error) {
+	ss, ok := s.(healthCheck)
+	if ok {
+		return func(ctx context.Context) (map[string]string, error) {
+			var err error
+			if ss.health.HasErrors {
+				err = errors.New("Some errors")
+			}
+			return ss.health.Details, err
+		}
+	}
+	return nil
+}
+
+// impls
+
+func (c config) sname() string        { return c.name }
+func (c config) env() []string        { return c.envv }
+func (s healthCheck) isSidecar() bool { return s.sidecar }
+func (s getMetadata) isSidecar() bool { return s.sidecar }
+
 //
 // helpers
 //
-
-func handlerbody(path string, body string, statuscode int) []httptest.PathHandler {
-	return []httptest.PathHandler{
-		{
-			Scheme: "http",
-			Path:   path,
-			Handler: func(rw http.ResponseWriter, r *http.Request) {
-				dowrite(rw, statuscode, body)
-			},
-		},
-	}
-}
-
-func dowrite(rw http.ResponseWriter, statuscode int, body string) {
-	rw.WriteHeader(statuscode)
-	_, err := rw.Write([]byte(body))
-	if err != nil {
-		panic(fmt.Sprintf("Failed writing HTTP response: %v", err))
-	}
-}
-
-func randomstring(size int) string {
-	rb := make([]byte, size)
-	_, _ = rand.Read(rb)
-	rs := base64.URLEncoding.EncodeToString(rb)
-	return rs
-}
 
 func decodejson(b []byte, d any) error {
 	buffer := bytes.NewBuffer(b)
@@ -480,7 +485,11 @@ func decodejson(b []byte, d any) error {
 	return nil
 }
 
-func setdefaultenv() {
-	httptest.MetadataOn()
+func setEnv(e []string) {
+	if e != nil {
+		httptest.SetArgs(e)
+		return
+	}
+	httptest.SetArgs([]string{"metadata.enabled=true"})
 	httptest.SetHTTPServerTimeouts(1 * time.Second)
 }

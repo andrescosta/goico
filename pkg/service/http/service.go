@@ -22,8 +22,6 @@ type Service struct {
 	base            *service.Base
 	server          *http.Server
 	healthCheckFunc HealthCheckFn
-	addressReady    chan string
-	AddressReady    <-chan string
 	pool            *sync.Pool
 }
 
@@ -114,15 +112,17 @@ func NewSidecar(opts ...func(*SidecarOptions)) (*Service, error) {
 }
 
 func (s *Service) Serve() error {
-	logger := zerolog.Ctx(s.base.Ctx)
-	logger.Info().Msgf("Starting process %d ", os.Getpid())
-
 	listener, err := net.Listen("tcp", *s.base.Addr)
 	if err != nil {
 		return fmt.Errorf("net.Listen: failed to create listener on %s: %w", *s.base.Addr, err)
 	}
-	s.addressReady <- listener.Addr().String()
-	close(s.addressReady)
+	return s.DoServe(listener)
+}
+
+func (s *Service) DoServe(listener net.Listener) error {
+	defer s.base.Stopped()
+	logger := zerolog.Ctx(s.base.Ctx)
+	logger.Info().Msgf("Starting process %d ", os.Getpid())
 
 	s.server.BaseContext = func(l net.Listener) context.Context { return s.base.Ctx }
 	errCh := make(chan error, 1)
@@ -208,8 +208,6 @@ func setDefaults(s *Service) {
 			return bytes.NewBuffer(make([]byte, 0, 1024))
 		},
 	}
-	s.addressReady = make(chan string, 1)
-	s.AddressReady = s.addressReady
 }
 
 // Setters

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -27,8 +28,14 @@ type Service struct {
 	Cancel    context.CancelFunc
 }
 
-func SetArgs(name string, value string) {
+func SetArgsV(name string, value string) {
 	os.Args = append(os.Args, fmt.Sprintf("--env:%s=%s", name, value))
+}
+
+func SetArgs(args []string) {
+	for _, arg := range args {
+		os.Args = append(os.Args, fmt.Sprintf("--env:%s", arg))
+	}
 }
 
 func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthCheckFn, stackLevel httpsvc.StackLevel) (*Service, error) {
@@ -49,7 +56,10 @@ func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthC
 	if err != nil {
 		return nil, err
 	}
-	addr, servedone := start(svc)
+	addr, servedone, err := start(localhost, svc)
+	if err != nil {
+		return nil, err
+	}
 	return &Service{
 		URL:       "http://" + addr,
 		Client:    &http.Client{Transport: &http.Transport{}},
@@ -59,18 +69,10 @@ func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthC
 
 func SetHTTPServerTimeouts(t time.Duration) {
 	timeout := t.String()
-	SetArgs("http.timeout.write", timeout)
-	SetArgs("http.timeout.read", timeout)
-	SetArgs("http.timeout.idle", timeout)
-	SetArgs("http.timeout.handler", timeout)
-}
-
-func MetadataOn() {
-	SetArgs("metadata.enabled", "true")
-}
-
-func MetadataOff() {
-	SetArgs("metadata.enabled", "false")
+	SetArgsV("http.timeout.write", timeout)
+	SetArgsV("http.timeout.read", timeout)
+	SetArgsV("http.timeout.idle", timeout)
+	SetArgsV("http.timeout.handler", timeout)
 }
 
 func NewSidecar(ctx context.Context, hfn httpsvc.HealthCheckFn) (*Service, error) {
@@ -91,7 +93,10 @@ func NewSidecar(ctx context.Context, hfn httpsvc.HealthCheckFn) (*Service, error
 	if err != nil {
 		return nil, err
 	}
-	addr, servedone := start(svc)
+	addr, servedone, err := start(localhost, svc)
+	if err != nil {
+		return nil, err
+	}
 	return &Service{
 		URL:       "http://" + addr,
 		Client:    &http.Client{Transport: &http.Transport{}},
@@ -99,18 +104,17 @@ func NewSidecar(ctx context.Context, hfn httpsvc.HealthCheckFn) (*Service, error
 	}, nil
 }
 
-func start(svc *httpsvc.Service) (string, chan error) {
+func start(addr string, svc *httpsvc.Service) (string, chan error, error) {
 	servedone := make(chan error, 1)
-	addrdone := make(chan string)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return "", nil, err
+	}
 	go func() {
-		a := <-svc.AddressReady
-		addrdone <- a
-	}()
-	go func() {
-		servedone <- svc.Serve()
+		servedone <- svc.DoServe(listener)
 		close(servedone)
 	}()
-	return <-addrdone, servedone
+	return listener.Addr().String(), servedone, nil
 }
 
 func (s *Service) Get(url string) (*http.Response, error) {
