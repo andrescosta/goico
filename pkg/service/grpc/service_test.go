@@ -2,8 +2,10 @@ package grpc_test
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
@@ -57,14 +59,22 @@ type (
 	}
 	healthCheck struct {
 		config
+		wait         time.Duration
+		nocheck      bool
 		returnsError bool
 	}
 )
 
 type Server struct {
+	closed   bool
 	echofn   func(*echo.EchoRequest) (*echo.EchoResponse, error)
 	noechofn func(*echo.EchoRequest) (*echo.Void, error)
 	echo.UnimplementedEchoServer
+}
+
+func (s *Server) Close() error {
+	s.closed = true
+	return nil
 }
 
 var (
@@ -168,6 +178,22 @@ func Test(t *testing.T) {
 		},
 		healthCheck{
 			returnsError: true,
+			wait:         50 * time.Microsecond,
+			nocheck:      true,
+			config: config{
+				name: "healthcheck+-",
+				healthCheckFnn: func(context.Context) error {
+					if randomInt(2) == 1 {
+						return nil
+					}
+					return errors.New("db error")
+				},
+				grpcserver: serverEcho,
+				envv:       []string{fmt.Sprintf("grpc.healthcheck=%s", 1*time.Microsecond)},
+			},
+		},
+		healthCheck{
+			returnsError: true,
 			config: config{
 				name:           "healthcheckerror",
 				healthCheckFnn: func(context.Context) error { return errors.New("db error") },
@@ -258,21 +284,26 @@ func (s healthCheck) exec(ctx context.Context, t *testing.T, svc *echo.Service, 
 	if _, err := c.NoEcho(ctx, &echo.EchoRequest{Code: 0, Message: "hello"}); err != nil {
 		t.Errorf("not expected error:%v", err)
 	}
-	hc, err := svc.HealthCheckClient(ctx)
-	if err != nil {
-		t.Errorf("not expected error: %v", err)
-		return
+	if s.wait != 0 {
+		time.Sleep(s.wait)
 	}
-	h, err := hc.Check(ctx, svc.Name())
-	if err != nil {
-		t.Errorf("not expected error: %v", err)
-		return
-	}
-	if !s.returnsError && *h.Enum() != *grpc_health_v1.HealthCheckResponse_SERVING.Enum() {
-		t.Errorf("expected SERVING got: %s", h.String())
-	}
-	if s.returnsError && *h.Enum() != *grpc_health_v1.HealthCheckResponse_NOT_SERVING.Enum().Enum() {
-		t.Errorf("expected NOT SERVING got: %s", h.String())
+	if !s.nocheck {
+		hc, err := svc.HealthCheckClient(ctx)
+		if err != nil {
+			t.Errorf("not expected error: %v", err)
+			return
+		}
+		h, err := hc.Check(ctx, svc.Name())
+		if err != nil {
+			t.Errorf("not expected error: %v", err)
+			return
+		}
+		if !s.returnsError && *h.Enum() != *grpc_health_v1.HealthCheckResponse_SERVING.Enum() {
+			t.Errorf("expected SERVING got: %s", h.String())
+		}
+		if s.returnsError && *h.Enum() != *grpc_health_v1.HealthCheckResponse_NOT_SERVING.Enum().Enum() {
+			t.Errorf("expected NOT SERVING got: %s", h.String())
+		}
 	}
 }
 
@@ -306,6 +337,10 @@ func run(t *testing.T, ss []scenario) {
 			if err != nil {
 				t.Errorf("not expected error:%v", err)
 			}
+			svc.Dispose()
+			if !s.server().closed {
+				t.Error("server not closed")
+			}
 		})
 	}
 }
@@ -323,4 +358,12 @@ func setEnv(e []string) {
 	}
 	httptest.SetArgs([]string{"metadata.enabled=true"})
 	httptest.SetHTTPServerTimeouts(1 * time.Second)
+}
+
+func randomInt(max int) int {
+	i, err := rand.Int(rand.Reader, big.NewInt(int64(max)))
+	if err != nil {
+		panic(err)
+	}
+	return int(i.Uint64())
 }

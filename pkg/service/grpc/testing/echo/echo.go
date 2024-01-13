@@ -73,7 +73,7 @@ func (s *Service) Serve() error {
 	return s.service.DoServe(s.listener)
 }
 
-func (s *Service) Disponse() {
+func (s *Service) Dispose() {
 	s.service.Dispose()
 }
 
