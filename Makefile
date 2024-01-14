@@ -8,7 +8,7 @@ ifneq ($(MSYSTEM), MSYS)
 endif
 endif
 
-.PHONY: init test testv gosec lint vuln release format $(FORMAT_FILES)
+.PHONY: init test test_coverage test_html gosec lint vuln release format $(FORMAT_FILES)
 
 lint:
 	@golangci-lint run ./...
@@ -19,8 +19,11 @@ vuln:
 test:
 	go test -count=1 -race ./...
 
-testv:
-	go test -count=1 -v -race ./...
+test_coverage: init
+	go test ./... -coverprofile=./reports/coverage.out
+
+test_html: test_coverage
+	go tool cover -html=./reports/coverage.out
 
 gosec: init
 	@gosec -quiet -out ./reports/gosec.txt ./... 
