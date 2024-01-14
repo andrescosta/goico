@@ -116,6 +116,7 @@ var handlers = []httptest.PathHandler{
 }
 
 func Test(t *testing.T) {
+	t.Parallel()
 	run(t, []scenario{
 		echo{
 			config: config{

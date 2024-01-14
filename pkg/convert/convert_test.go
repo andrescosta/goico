@@ -17,6 +17,7 @@ type d2 struct {
 }
 
 func TestSliceWithFn(t *testing.T) {
+	t.Parallel()
 	d1s := []d1{{"1"}, {"3"}, {"5"}}
 	set := collection.NewSet("1", "3", "5")
 	d2s := SliceWithFn(d1s, func(d d1) d2 { return d2{two: d.one} })

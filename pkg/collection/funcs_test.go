@@ -9,6 +9,7 @@ import (
 )
 
 func TestFirstOrDefault(t *testing.T) {
+	t.Parallel()
 	valuess := []string{"A", "A", "B", "B", "C", "C", "D"}
 	v := FirstOrDefault(valuess, "X")
 	if v != "A" {
@@ -22,6 +23,7 @@ func TestFirstOrDefault(t *testing.T) {
 }
 
 func TestUnwrapError(t *testing.T) {
+	t.Parallel()
 	err1 := errors.New("error 1")
 	e := UnwrapError(err1)
 	if len(e) != 1 {

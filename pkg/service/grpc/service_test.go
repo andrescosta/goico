@@ -120,6 +120,7 @@ func (s *Server) NoEcho(_ context.Context, e *echo.EchoRequest) (*echo.Void, err
 }
 
 func Test(t *testing.T) {
+	t.Parallel()
 	run(t, []scenario{
 		echos{
 			config: config{

@@ -55,6 +55,7 @@ type (
 )
 
 func Test(t *testing.T) {
+	t.Parallel()
 	run(t, []scenario{
 		getMetadata{
 			config: config{

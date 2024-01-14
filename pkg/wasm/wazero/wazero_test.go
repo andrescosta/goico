@@ -70,6 +70,7 @@ type (
 )
 
 func Test(t *testing.T) {
+	t.Parallel()
 	scenarios := []scenario{
 		&scenarioresult{
 			config:    config{"test_ok", echo},
@@ -130,6 +131,7 @@ func Test(t *testing.T) {
 }
 
 func TestParalel(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	ctx := context.Background()
 	runtime, err := wazero.NewWasmRuntime(ctx, dir)
@@ -182,7 +184,7 @@ func TestParalel(t *testing.T) {
 		wgready.Add(1)
 		go func(s scenario) {
 			defer wg.Done()
-			t.Run(s.name()+"_paralel", func(t *testing.T) {
+			t.Run(s.name()+"_parallel", func(t *testing.T) {
 				m, err := wazero.NewWasmModuleString(ctx, runtime, s.wasm(), "event", s.logFn())
 				if err != nil {
 					t.Errorf("not expected error: %v", err)
