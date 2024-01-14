@@ -72,7 +72,7 @@ func NewWithContext(ctxInfo map[string]string) *zerolog.Logger {
 
 func getFileName() (name string) {
 	name = env.String("log.file.name", "file.log")
-	name = strings.Replace(name, "${workdir}", env.WorkDir(), 1)
+	name = strings.Replace(name, "${workdir}", env.Workdir(), 1)
 	return
 }
 

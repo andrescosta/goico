@@ -5,10 +5,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"time"
 	"unsafe"
 
-	"github.com/andrescosta/goico/pkg/env"
 	"github.com/rs/zerolog"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -123,14 +121,7 @@ func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, id uint32, data 
 	logger.Debug().Msg("calling main method")
 	// The result of the call will be stored in struct pointed by resultFuncPtr
 
-	// go func() {
-	// 	time.Sleep(20 * time.Second)
-	// 	if err := f.module.CloseWithExitCode(ctx, 1); err != nil {
-	// 		log.Panicln(err)
-	// 	}
-	// }()
-	timeout := env.Duration("wasm.timeout", 2*time.Minute)
-	_, err = callWithTimeout(ctx, f.mainFunc, *timeout, resultFuncPtr, api.EncodeU32(id), funcParameterPtr, funcParameterSize)
+	_, err = call(ctx, f.mainFunc, resultFuncPtr, api.EncodeU32(id), funcParameterPtr, funcParameterSize)
 	if err != nil {
 		return 0, "", err
 	}
@@ -139,15 +130,6 @@ func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, id uint32, data 
 		return 0, "", err
 	}
 	return code, res, nil
-}
-func call(ctx context.Context, f api.Function, params ...uint64) ([]uint64, error) {
-	return callWithTimeout(ctx, f, 5*time.Second, params...)
-}
-
-func callWithTimeout(ctx context.Context, f api.Function, timeout time.Duration, params ...uint64) ([]uint64, error) {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	return f.Call(ctx, params...)
 }
 
 func (f *WasmModuleString) reserveMemoryForResult(ctx context.Context) (uint64, uint64, error) {
@@ -231,4 +213,8 @@ func (f *WasmModuleString) Close(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+func call(ctx context.Context, f api.Function, params ...uint64) ([]uint64, error) {
+	return f.Call(ctx, params...)
 }

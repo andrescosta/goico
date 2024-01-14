@@ -15,7 +15,7 @@ type WasmRuntime struct {
 }
 
 // Documentation: https://github.com/tetratelabs/wazero/blob/main/examples/multiple-runtimes/counter.go
-func NewWasmRuntime(ctx context.Context, tempDir string) (*WasmRuntime, error) {
+func NewWasmRuntime(tempDir string) (*WasmRuntime, error) {
 	wruntime := &WasmRuntime{}
 	// Creates a directory to store wazero cache
 	if err := os.MkdirAll(tempDir, os.ModeExclusive); err != nil {
@@ -28,13 +28,12 @@ func NewWasmRuntime(ctx context.Context, tempDir string) (*WasmRuntime, error) {
 	wruntime.cacheDir = &cacheDir
 	cache, err := wazero.NewCompilationCacheWithDir(cacheDir)
 	if err != nil {
-		wruntime.Close(ctx)
+		err := os.RemoveAll(cacheDir)
 		return nil, err
 	}
-	wruntime.runtimeConfig =
-		wazero.NewRuntimeConfig().
-			WithCompilationCache(cache).
-			WithCloseOnContextDone(true)
+	wruntime.runtimeConfig = wazero.NewRuntimeConfig().
+		WithCompilationCache(cache).
+		WithCloseOnContextDone(true)
 	wruntime.cache = cache
 	return wruntime, nil
 }

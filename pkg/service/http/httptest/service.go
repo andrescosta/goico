@@ -58,10 +58,10 @@ func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthC
 
 func SetHTTPServerTimeouts(t time.Duration) {
 	timeout := t.String()
-	env.SetArgsV("http.timeout.write", timeout)
-	env.SetArgsV("http.timeout.read", timeout)
-	env.SetArgsV("http.timeout.idle", timeout)
-	env.SetArgsV("http.timeout.handler", timeout)
+	env.SetargsV("http.timeout.write", timeout)
+	env.SetargsV("http.timeout.read", timeout)
+	env.SetargsV("http.timeout.idle", timeout)
+	env.SetargsV("http.timeout.handler", timeout)
 }
 
 func NewSidecar(ctx context.Context, hfn httpsvc.HealthCheckFn) (*Service, error) {

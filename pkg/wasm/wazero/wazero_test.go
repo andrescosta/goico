@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -113,7 +114,7 @@ func Test(t *testing.T) {
 	}
 	dir := t.TempDir()
 	ctx := context.Background()
-	runtime, err := wazero.NewWasmRuntime(ctx, dir)
+	runtime, err := wazero.NewWasmRuntime(dir)
 	if err != nil {
 		t.Fatalf("not expected error: %v", err)
 	}
@@ -131,7 +132,7 @@ func Test(t *testing.T) {
 				m.Close(ctx)
 			})
 			id, msg := s.input()
-			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 			defer cancel()
 			code, str, err := m.ExecuteMainFunc(ctx, id, msg)
 			s.validateError(t, err)
@@ -143,7 +144,7 @@ func Test(t *testing.T) {
 func TestParalel(t *testing.T) {
 	dir := t.TempDir()
 	ctx := context.Background()
-	runtime, err := wazero.NewWasmRuntime(ctx, dir)
+	runtime, err := wazero.NewWasmRuntime(dir)
 	if err != nil {
 		t.Fatalf("not expected error: %v", err)
 	}
@@ -199,8 +200,9 @@ func TestParalel(t *testing.T) {
 		wgready.Add(1)
 		go func(s scenario) {
 			defer wg.Done()
-			t.Setenv("wasm.timeout", (2 * time.Second).String())
 			t.Run(s.name()+"_parallel", func(t *testing.T) {
+				_, ok := os.LookupEnv("wasm.timeout")
+				print(ok)
 				m, err := wazero.NewWasmModuleString(ctx, runtime, s.wasm(), "event", s.logFn())
 				if err != nil {
 					t.Errorf("not expected error: %v", err)
@@ -214,7 +216,9 @@ func TestParalel(t *testing.T) {
 				id, msg := s.input()
 				wgready.Done()
 				wgready.Wait()
+				ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 				code, str, err := m.ExecuteMainFunc(ctx, id, msg)
+				cancel()
 				s.validateError(t, err)
 				s.validate(t, code, str)
 			})
