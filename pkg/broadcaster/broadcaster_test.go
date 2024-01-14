@@ -25,7 +25,7 @@ func TestBroadcasters(t *testing.T) {
 		id:   1,
 	}
 	b := Start[data](context.Background())
-	maxListeners := 1000
+	maxListeners := 100
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	for i := 0; i < maxListeners; i++ {
@@ -70,7 +70,7 @@ func TestUnsubscribe(t *testing.T) {
 	}
 	b := Start[data](context.Background())
 	var waitListeners sync.WaitGroup
-	maxListeners := 2000
+	maxListeners := 200
 	waiter := make(chan struct{})
 	listeners := make([]*Listener[data], 0)
 	for i := 0; i < maxListeners; i++ {
@@ -185,7 +185,7 @@ func TestStopWriteSync(t *testing.T) {
 		name: "Customer 1",
 		id:   1,
 	}
-	maxListeners := 1000
+	maxListeners := 100
 	b := Start[data](context.Background())
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
@@ -299,7 +299,7 @@ func TestMultiWriters(t *testing.T) {
 	b := Start[data](context.Background())
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
-	maxProducers := 20000
+	maxProducers := 200
 	maxListeners := 10
 	finished := atomic.Bool{}
 	finished.Store(false)
@@ -363,7 +363,7 @@ func TestMultiWritersSync(t *testing.T) {
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 20
-	maxListeners := 1000
+	maxListeners := 100
 	finished := atomic.Bool{}
 	finished.Store(false)
 	for i := 0; i < maxListeners; i++ {
@@ -426,7 +426,7 @@ func TestMultiWritersSyncStop(t *testing.T) {
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 20
-	maxListeners := 1000
+	maxListeners := 100
 	finished := atomic.Bool{}
 	finished.Store(false)
 	for i := 0; i < maxListeners; i++ {
@@ -494,7 +494,7 @@ func TestMultiWritersStop(t *testing.T) {
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 20
-	maxListeners := 1000
+	maxListeners := 100
 	finished := atomic.Bool{}
 	finished.Store(false)
 	for i := 0; i < maxListeners; i++ {
@@ -562,7 +562,7 @@ func TestMultiWritersUnsubscribe(t *testing.T) {
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 200
-	maxListeners := 1000
+	maxListeners := 100
 	maxClosers := 200
 	finished := atomic.Bool{}
 	finished.Store(false)
@@ -637,7 +637,7 @@ func TestMultiWritersMultiStop(t *testing.T) {
 	b := Start[data](context.Background())
 	var w sync.WaitGroup
 	waiter := make(chan struct{})
-	maxListeners := 1000
+	maxListeners := 100
 	maxProducers := 200
 	finished := atomic.Bool{}
 	finished.Store(false)

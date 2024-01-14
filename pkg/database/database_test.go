@@ -44,11 +44,11 @@ type (
 type (
 	addStep            struct{}
 	deleteStep         struct{}
-	deleteNotStep      struct{}
+	deleteDBOnlyStep   struct{}
 	updateStep         struct{}
 	allStep            struct{}
 	getStep            struct{}
-	notgetStep         struct{}
+	notfoundStep       struct{}
 	fillRandomDataStep struct{}
 )
 
@@ -66,12 +66,12 @@ type dataIsDifferentError struct {
 
 var (
 	add            = addStep{}
-	deleteit       = deleteStep{}
-	deletenot      = deleteNotStep{}
+	deleteone      = deleteStep{}
+	onlydelete     = deleteDBOnlyStep{}
 	update         = updateStep{}
 	all            = allStep{}
 	get            = getStep{}
-	notget         = notgetStep{}
+	notfound       = notfoundStep{}
 	fillrandomdata = fillRandomDataStep{}
 )
 
@@ -86,11 +86,11 @@ func TestOperations(t *testing.T) {
 	scenarios := []*scenario{
 		newscenario("add", fillrandomdata, add),
 		newscenario("get", fillrandomdata, add, get),
-		newscenario("delete", fillrandomdata, add, deletenot, notget),
+		newscenario("delete", fillrandomdata, add, onlydelete, notfound),
 		newscenario("update", fillrandomdata, add, update, get),
-		newscenario("all", fillrandomdata, fillrandomdata, fillrandomdata, add, all),
-		newscenario("all_del", fillrandomdata, fillrandomdata, add, deleteit, all),
-		newscenario("all_update", fillrandomdata, fillrandomdata, add, update, all),
+		newscenario("getall", fillrandomdata, fillrandomdata, fillrandomdata, add, all),
+		newscenario("getall_and_delete", fillrandomdata, fillrandomdata, add, deleteone, all),
+		newscenario("getall_and_update", fillrandomdata, fillrandomdata, add, update, all),
 	}
 	dbName := filepath.Join(t.TempDir(), "database.md")
 	db, err := Open(dbName)
@@ -115,7 +115,7 @@ func TestBucketErrors(t *testing.T) {
 	scenarios := []*scenario{
 		newscenario("add", add),
 		newscenario("get", get),
-		newscenario("delete", deleteit),
+		newscenario("delete", deleteone),
 		newscenario("update", update),
 		newscenario("all", all),
 	}
@@ -261,7 +261,7 @@ func (g getStep) execute(s *scenario) error {
 	return nil
 }
 
-func (n notgetStep) execute(s *scenario) error {
+func (n notfoundStep) execute(s *scenario) error {
 	if len(s.memory) == 0 {
 		return ErrEmptyMemory
 	}
@@ -276,7 +276,7 @@ func (n notgetStep) execute(s *scenario) error {
 }
 
 func (d deleteStep) execute(s *scenario) error {
-	err := deleteNotStep{}.execute(s)
+	err := deleteDBOnlyStep{}.execute(s)
 	if err != nil {
 		return err
 	}
@@ -284,7 +284,7 @@ func (d deleteStep) execute(s *scenario) error {
 	return nil
 }
 
-func (d deleteNotStep) execute(s *scenario) error {
+func (d deleteDBOnlyStep) execute(s *scenario) error {
 	if len(s.memory) == 0 {
 		return ErrEmptyMemory
 	}

@@ -147,11 +147,6 @@ type (
 		args        envvs
 		expected    envvs
 	}
-
-	backup struct {
-		args []string
-		envs []string
-	}
 )
 
 func TestLoad(t *testing.T) {
@@ -303,9 +298,9 @@ func TestLoad(t *testing.T) {
 }
 
 func TestLoadErrors(t *testing.T) {
-	b := backupOsArgsAndEnv(t)
+	b := env.Backup()
 	t.Cleanup(func() {
-		restoreOsArgsAndEnv(t, b)
+		env.Restore(b)
 	})
 	os.Setenv(env.EnviromentVar, "nope")
 	if err := env.Load(serviceName); err == nil {
@@ -318,9 +313,9 @@ func TestLoadErrors(t *testing.T) {
 }
 
 func TestDirs(t *testing.T) {
-	b := backupOsArgsAndEnv(t)
+	b := env.Backup()
 	t.Cleanup(func() {
-		restoreOsArgsAndEnv(t, b)
+		env.Restore(b)
 	})
 	tempDir := t.TempDir()
 	initializeDirVars(tempDir)
@@ -443,9 +438,9 @@ func TestInvalid(t *testing.T) {
 }
 
 func initializeScenario(t *testing.T, s scenario) {
-	b := backupOsArgsAndEnv(t)
+	b := env.Backup()
 	t.Cleanup(func() {
-		restoreOsArgsAndEnv(t, b)
+		env.Restore(b)
 	})
 
 	tempDir := t.TempDir()
@@ -510,25 +505,6 @@ func assertValue(t *testing.T, en envv) {
 		if v == nil || *v != en.value.(time.Duration) {
 			t.Errorf(fmt.Sprintf("expecting for %s(time.Duration): %s got %s", en.name, en.value, v))
 		}
-	}
-}
-
-func backupOsArgsAndEnv(t *testing.T) backup {
-	t.Helper()
-	old := os.Args
-	newArgs := make([]string, len(old))
-	copy(newArgs, os.Args)
-	os.Args = newArgs
-	return backup{old, os.Environ()}
-}
-
-func restoreOsArgsAndEnv(t *testing.T, b backup) {
-	t.Helper()
-	os.Args = b.args
-	os.Clearenv()
-	for _, ss := range b.envs {
-		sss := strings.Split(ss, "=")
-		os.Setenv(sss[0], sss[1])
 	}
 }
 

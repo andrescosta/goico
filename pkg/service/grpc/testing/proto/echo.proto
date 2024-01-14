@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option go_package = "/echo";
+
+
+service Echo {
+  rpc Echo (EchoRequest) returns (EchoResponse);
+  rpc NoEcho (EchoRequest) returns (Void);
+}
+
+
+message Void{}
+
+message EchoRequest {
+  uint32 code = 1;
+  string message = 2;
+}
+
+message EchoResponse {
+  uint32 code = 1;
+  string message = 2;
+}

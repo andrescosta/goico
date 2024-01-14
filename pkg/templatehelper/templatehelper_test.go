@@ -14,6 +14,7 @@ type data struct {
 }
 
 func TestRender(t *testing.T) {
+	t.Parallel()
 	b := strings.Builder{}
 	template1 := `Usage: {{.Long | trim | capitalize}}`
 	d := data{Long: "  longdata   "}

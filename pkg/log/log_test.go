@@ -35,10 +35,6 @@ const (
 )
 
 type (
-	backup struct {
-		envs   []string
-		stdout *os.File
-	}
 	scenario struct {
 		types          int
 		name           string
@@ -310,10 +306,11 @@ func TestLogToConsole(t *testing.T) {
 func execute(t *testing.T, scenarios []scenario, tempDir string) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			b := makeBackup()
-			setEnvs(s.envs, tempDir)
+			b := env.Backup()
+			setEnvs(s.envs)
+			setTempDir(tempDir)
 			t.Cleanup(func() {
-				restoreBackup(b)
+				env.Restore(b)
 			})
 			var w *os.File
 			var r io.Reader
@@ -407,28 +404,16 @@ func execute(t *testing.T, scenarios []scenario, tempDir string) {
 	}
 }
 
-func makeBackup() *backup {
-	return &backup{
-		envs:   os.Environ(),
-		stdout: os.Stdout,
-	}
-}
-
-func restoreBackup(b *backup) {
-	os.Clearenv()
-	setEnvs(b.envs, "")
-	os.Stdout = b.stdout
-}
-
-func setEnvs(envs []string, tempDir string) {
+func setEnvs(envs []string) {
 	for _, ss := range envs {
 		sss := strings.Split(ss, "=")
 		os.Setenv(sss[0], sss[1])
 	}
-	if tempDir != "" {
-		os.Setenv(env.WorkDirVar, tempDir)
-		os.Setenv(env.BaseDir(), tempDir)
-	}
+}
+
+func setTempDir(tempDir string) {
+	os.Setenv(env.WorkDirVar, tempDir)
+	os.Setenv(env.BaseDir(), tempDir)
 }
 
 func buildContextMap(context []string) map[string]string {

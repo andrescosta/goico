@@ -129,3 +129,7 @@ func setLumberjack(cfg file) {
 		MaxAge:     cfg.MaxAge,
 	}
 }
+
+func DisableLog() {
+	zerolog.SetGlobalLevel(zerolog.Disabled)
+}

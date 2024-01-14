@@ -19,45 +19,49 @@ import (
 )
 
 type Service struct {
-	service         *service.Service
+	base            *service.Base
 	server          *http.Server
-	healthCheckFunc HealthChkFn
+	healthCheckFunc HealthCheckFn
 	pool            *sync.Pool
+	imsidecar       bool
 }
 
 type healthStatus struct {
-	status  string
-	details map[string]string
+	Status  string            `json:"status"`
+	Details map[string]string `json:"details"`
 }
 
 type (
-	initRoutesFn = func(context.Context, *mux.Router) error
-	HealthChkFn  = func(context.Context) (map[string]string, error)
+	initRoutesFn  = func(context.Context, *mux.Router) error
+	HealthCheckFn = func(context.Context) (map[string]string, error)
 )
 
-type ServiceOptions struct {
-	extras  *extrasOptions
-	service *service.Service
+type SidecarOptions struct {
+	common *commonOptions
+	base   *service.Base
 }
 
-type RouterOptions struct {
+type ServiceOptions struct {
 	addr         *string
-	extras       *extrasOptions
+	common       *commonOptions
 	ctx          context.Context
 	name         string
 	initRoutesFn initRoutesFn
 }
 
-type extrasOptions struct {
-	healthChkFn HealthChkFn
+type commonOptions struct {
+	healthChkFn       HealthCheckFn
+	stackLevelOnError StackLevel
 }
 
-func New(opts ...func(*RouterOptions)) (*Service, error) {
+func New(opts ...func(*ServiceOptions)) (*Service, error) {
 	svc := &Service{}
-	svc.initWithDefaults()
+	setDefaults(svc)
 
-	opt := &RouterOptions{
-		extras:       &extrasOptions{},
+	opt := &ServiceOptions{
+		common: &commonOptions{
+			stackLevelOnError: StackLevelSimple,
+		},
 		ctx:          context.Background(),
 		initRoutesFn: func(ctx context.Context, r *mux.Router) error { return nil },
 		addr:         nil,
@@ -69,7 +73,7 @@ func New(opts ...func(*RouterOptions)) (*Service, error) {
 	}
 
 	//
-	s, err := service.New(
+	base, err := service.New(
 		service.WithName(opt.name),
 		service.WithAddr(opt.addr),
 		service.WithContext(opt.ctx),
@@ -78,68 +82,66 @@ func New(opts ...func(*RouterOptions)) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc.service = s
+	svc.base = base
 
-	// Mux Router config
-	router := svc.buildRouter()
+	// Mux Router initialization
+	router := svc.initializeRouter(opt.common)
 
 	//// routes initialization
-	if err := opt.initRoutesFn(svc.service.Ctx, router); err != nil {
+	if err := opt.initRoutesFn(svc.base.Ctx, router); err != nil {
 		return nil, err
-	}
-	// add health check handler if provided
-	if opt.extras.healthChkFn != nil {
-		svc.initHealthCheckFn(opt.extras.healthChkFn, router)
 	}
 	return svc, nil
 }
 
-func NewWithServiceContainer(opts ...func(*ServiceOptions)) (*Service, error) {
+func NewSidecar(opts ...func(*SidecarOptions)) (*Service, error) {
 	svc := &Service{}
-	svc.initWithDefaults()
+	setDefaults(svc)
 
-	opt := &ServiceOptions{
-		extras:  &extrasOptions{},
-		service: nil,
+	opt := &SidecarOptions{
+		common: &commonOptions{},
+		base:   nil,
 	}
 	for _, o := range opts {
 		o(opt)
 	}
-	svc.service = opt.service
-	// Mux Router config
-	router := svc.buildRouter()
-	// add health check handler if provided
-	if opt.extras.healthChkFn != nil {
-		svc.initHealthCheckFn(opt.extras.healthChkFn, router)
-	}
+	svc.base = opt.base
+	svc.imsidecar = true
+
+	// Mux Router initialization
+	_ = svc.initializeRouter(opt.common)
 	return svc, nil
 }
 
 func (s *Service) Serve() error {
-	logger := zerolog.Ctx(s.service.Ctx)
-	logger.Info().Msgf("Starting process %d ", os.Getpid())
-	if s.service.Addr == nil {
-		return errors.New("the address was not configured")
-	}
-
-	listener, err := net.Listen("tcp", *s.service.Addr)
-	s.server.BaseContext = func(l net.Listener) context.Context { return s.service.Ctx }
+	listener, err := net.Listen("tcp", *s.base.Addr)
 	if err != nil {
-		return fmt.Errorf("net.Listen: failed to create listener on %s: %w", *s.service.Addr, err)
+		return fmt.Errorf("net.Listen: failed to create listener on %s: %w", *s.base.Addr, err)
 	}
+	return s.DoServe(listener)
+}
 
+func (s *Service) DoServe(listener net.Listener) error {
+	defer s.base.Stopped()
+	logger := zerolog.Ctx(s.base.Ctx)
+	logger.Info().Msgf("Starting process %d ", os.Getpid())
+
+	s.server.BaseContext = func(l net.Listener) context.Context { return s.base.Ctx }
 	errCh := make(chan error, 1)
 	go func() {
-		<-s.service.Ctx.Done()
+		<-s.base.Ctx.Done()
 		logger.Debug().Msg("HTTP service: context closed")
-		shutdownCtx, done := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, done := context.WithTimeout(context.Background(),
+			*env.Duration("http.shutdown.timeout", time.Second*5))
 		defer done()
 		logger.Debug().Msg("HTTP service: shutting down")
 		errCh <- s.server.Shutdown(shutdownCtx)
 	}()
 
-	logger.Debug().Msgf("HTTP service: started on %s", *s.service.Addr)
-	s.service.Started()
+	logger.Debug().Msgf("HTTP service: started on %s", listener.Addr().String())
+	if !s.imsidecar {
+		s.base.Started()
+	}
 
 	if err := s.server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("http.Serve: failed to serve: %w", err)
@@ -156,13 +158,13 @@ func (s *Service) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/JSON")
 	status := &healthStatus{}
 	m, err := s.healthCheckFunc(r.Context())
-	status.details = m
+	status.Details = m
 	var statusCode int
 	if err != nil {
-		status.status = "error"
+		status.Status = "error"
 		statusCode = http.StatusInternalServerError
 	} else {
-		status.status = "alive"
+		status.Status = "alive"
 		statusCode = http.StatusOK
 	}
 	b := s.pool.Get().(*bytes.Buffer)
@@ -173,35 +175,38 @@ func (s *Service) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Service) metadataHandler(w http.ResponseWriter, _ *http.Request) {
 	b := s.pool.Get().(*bytes.Buffer)
 	b.Reset()
-	WriteJSONBody(b, s.service.Metadata(), http.StatusOK, `{error:"error getting metadata"}`, w)
+	WriteJSONBody(b, s.base.Metadata(), http.StatusOK, `{error:"error getting metadata"}`, w)
 }
 
-func (s *Service) initHealthCheckFn(h HealthChkFn, r *mux.Router) {
-	s.healthCheckFunc = h
-	r.HandleFunc("/health", s.healthCheckHandler)
-}
-
-func (s *Service) buildRouter() (r *mux.Router) {
+func (s *Service) initializeRouter(opts *commonOptions) (r *mux.Router) {
 	// Mux Router config
 	r = mux.NewRouter()
 	//// setting middlewares
-	rf := RecoveryFunc{StackLevel: StackLevelFullStack}
+	rf := RecoveryFunc{StackLevel: opts.stackLevelOnError}
 	r.Use(rf.TryToRecover())
 	r.Use(obs.GetLoggingMiddleware)
-	s.service.OtelProvider.InstrRouter(s.service.Name, r)
+	s.base.OtelProvider.InstrRouter(s.base.Name(), r)
 	if env.Bool("metadata.enabled", false) {
 		r.HandleFunc("/meta", s.metadataHandler)
 	}
-	s.server = &http.Server{
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
-		Handler:      http.TimeoutHandler(r, time.Second, ""),
+	if opts.healthChkFn != nil {
+		s.healthCheckFunc = opts.healthChkFn
+		r.HandleFunc("/health", s.healthCheckHandler)
 	}
+	s.server = newHTTPServer(r)
 	return
 }
 
-func (s *Service) initWithDefaults() {
+func newHTTPServer(r http.Handler) *http.Server {
+	return &http.Server{
+		WriteTimeout: *env.Duration("http.timeout.write", time.Second*5),
+		ReadTimeout:  *env.Duration("http.timeout.read", time.Second*5),
+		IdleTimeout:  *env.Duration("http.timeout.idle", time.Second*5),
+		Handler:      http.TimeoutHandler(r, *env.Duration("http.timeout.handler", time.Second), ""),
+	}
+}
+
+func setDefaults(s *Service) {
 	s.pool = &sync.Pool{
 		New: func() interface{} {
 			return bytes.NewBuffer(make([]byte, 0, 1024))
@@ -210,43 +215,58 @@ func (s *Service) initWithDefaults() {
 }
 
 // Setters
-func WithInitRoutesFn(i initRoutesFn) func(*RouterOptions) {
-	return func(w *RouterOptions) {
+func WithInitRoutesFn(i initRoutesFn) func(*ServiceOptions) {
+	return func(w *ServiceOptions) {
 		w.initRoutesFn = i
 	}
 }
 
-func WithAddr(a *string) func(*RouterOptions) {
-	return func(r *RouterOptions) {
+func WithAddr(a *string) func(*ServiceOptions) {
+	return func(r *ServiceOptions) {
 		r.addr = a
 	}
 }
 
-func WithName(n string) func(*RouterOptions) {
-	return func(r *RouterOptions) {
+func WithName(n string) func(*ServiceOptions) {
+	return func(r *ServiceOptions) {
 		r.name = n
 	}
 }
 
-func WithContext(ctx context.Context) func(*RouterOptions) {
-	return func(r *RouterOptions) {
+func WithContext(ctx context.Context) func(*ServiceOptions) {
+	return func(r *ServiceOptions) {
 		r.ctx = ctx
 	}
 }
 
-func WithHealthCheck[T *ServiceOptions | *RouterOptions](healthChkFn HealthChkFn) func(T) {
+func WithStackLevelOnError[T *SidecarOptions | *ServiceOptions](lvl StackLevel) func(T) {
 	return func(t T) {
-		switch v := any(t).(type) {
-		case *ServiceOptions:
-			v.extras.healthChkFn = healthChkFn
-		case *RouterOptions:
-			v.extras.healthChkFn = healthChkFn
+		if t != nil {
+			switch v := any(t).(type) {
+			case *SidecarOptions:
+				v.common.stackLevelOnError = lvl
+			case *ServiceOptions:
+				v.common.stackLevelOnError = lvl
+			}
 		}
 	}
 }
 
-func WithContainer(svc *service.Service) func(*ServiceOptions) {
-	return func(opts *ServiceOptions) {
-		opts.service = svc
+func WithHealthCheck[T *SidecarOptions | *ServiceOptions](healthChkFn HealthCheckFn) func(T) {
+	return func(t T) {
+		if t != nil {
+			switch v := any(t).(type) {
+			case *SidecarOptions:
+				v.common.healthChkFn = healthChkFn
+			case *ServiceOptions:
+				v.common.healthChkFn = healthChkFn
+			}
+		}
+	}
+}
+
+func WithPrimaryService(svc *service.Base) func(*SidecarOptions) {
+	return func(opts *SidecarOptions) {
+		opts.base = svc
 	}
 }

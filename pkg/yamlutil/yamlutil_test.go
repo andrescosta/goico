@@ -31,8 +31,9 @@ queues:
 `
 
 func TestDecodeFile(t *testing.T) {
+	t.Parallel()
 	fileName := filepath.Join(t.TempDir(),
-		"file.yaml")
+		"file-decode.yaml")
 	if err := os.WriteFile(fileName, []byte(strings.TrimSpace(file)), os.ModeAppend); err != nil {
 		t.Fatalf("os.WriteFile: %s", err)
 	}
@@ -61,6 +62,7 @@ func TestDecodeFile(t *testing.T) {
 }
 
 func TestMarchal(t *testing.T) {
+	t.Parallel()
 	do := data{
 		ID:     "id_1",
 		Name:   "name_1",
@@ -73,7 +75,7 @@ func TestMarchal(t *testing.T) {
 	}
 	t.Log(m)
 	fileName := filepath.Join(t.TempDir(),
-		"file2.yaml")
+		"file-marchal.yaml")
 	if err := os.WriteFile(fileName, []byte(*m), os.ModeAppend); err != nil {
 		t.Fatalf("os.WriteFile: %s", err)
 	}
@@ -102,12 +104,13 @@ func TestMarchal(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
+	t.Parallel()
 	d := data{}
 	if err := DecodeFile("myfile.yaml", &d); err == nil {
 		t.Errorf("DecodeFile: expected error got <nil>")
 	}
 	fileName := filepath.Join(t.TempDir(),
-		"file3.yaml")
+		"file-errors.yaml")
 	if err := os.WriteFile(fileName, []byte("aaasssdshjk"), os.ModeAppend); err != nil {
 		t.Fatalf("os.WriteFile: %s", err)
 	}

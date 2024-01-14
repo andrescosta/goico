@@ -15,15 +15,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type Setter func(*Service)
+type Setter func(*Base)
 
-// A Service is a process that runs in the background.
-type Service struct {
-	Name         string
-	Kind         string
+// Base provides common functionality for processes that run in background.
+type Base struct {
 	meta         *meta.Data
 	Addr         *string
-	startTime    time.Time
 	OtelProvider *obs.OtelProvider
 	Ctx          context.Context
 	done         context.CancelFunc
@@ -34,15 +31,13 @@ var (
 	ErrEnvLoading = errors.New("env.Populate: error initializing otel stack")
 )
 
-func New(opts ...Setter) (*Service, error) {
+func New(opts ...Setter) (*Base, error) {
 	// Instantiate with default values
-	svc := &Service{
-		Name:         "",
-		Kind:         "",
-		Ctx:          context.Background(),
-		Addr:         nil,
-		meta:         nil,
-		startTime:    time.Now(),
+	svc := &Base{
+		Ctx: context.Background(),
+		meta: &meta.Data{
+			StartTime: time.Now(),
+		},
 		OtelProvider: nil,
 	}
 
@@ -51,7 +46,7 @@ func New(opts ...Setter) (*Service, error) {
 	}
 
 	// .env files loading
-	if err := env.Load(svc.Name); err != nil {
+	if err := env.Load(svc.meta.Name); err != nil {
 		if !errors.Is(err, env.ErrNoEnvFileLoaded) {
 			return nil, errors.Join(err, ErrEnvLoading)
 		}
@@ -60,19 +55,16 @@ func New(opts ...Setter) (*Service, error) {
 	svc.Ctx, svc.done = signal.NotifyContext(svc.Ctx, syscall.SIGINT, syscall.SIGTERM)
 
 	// log initialization
-	logger := log.NewWithContext(map[string]string{"service": svc.Name})
+	logger := log.NewWithContext(map[string]string{"service": svc.meta.Name})
 	svc.Ctx = logger.WithContext(svc.Ctx)
 
 	if svc.Addr == nil {
-		addrEnv := svc.Name + ".addr"
+		addrEnv := svc.meta.Name + ".addr"
 		svc.Addr = env.StringOrNil(addrEnv)
 	}
 
-	// metadata info
-	metainfo := meta.Data{Name: svc.Name, Version: "1", Kind: svc.Kind}
-
 	// observability provider controlled by envs obs.*
-	o, err := obs.New(svc.Ctx, metainfo)
+	o, err := obs.New(svc.Ctx, *svc.meta)
 	if err != nil {
 		return nil, errors.Join(err, ErrOtelStack)
 	}
@@ -83,26 +75,34 @@ func New(opts ...Setter) (*Service, error) {
 	return svc, nil
 }
 
-func (s *Service) Started() {
-	s.startTime = time.Now()
+func (s *Base) Started() {
+	s.meta.StartTime = time.Now()
 }
 
-func (s *Service) WhenStarted() time.Time {
-	return s.startTime
+func (s *Base) Stopped() {
+	s.meta.StartTime = time.Time{}
 }
 
-func (s *Service) Metadata() map[string]string {
+func (s *Base) Name() string {
+	return s.meta.Name
+}
+
+func (s *Base) WhenStarted() time.Time {
+	return s.meta.StartTime
+}
+
+func (s *Base) Metadata() map[string]string {
 	m := map[string]string{
-		"Name":       s.Name,
-		"Addr":       *s.Addr,
-		"Start Time": s.WhenStarted().Format(time.UnixDate),
-		"Kind":       s.Kind,
+		"Name":      s.meta.Name,
+		"Addr":      *s.Addr,
+		"StartTime": s.WhenStarted().Format(time.UnixDate),
+		"Kind":      s.meta.Kind,
 	}
 	return m
 }
 
 // Waits for the done signal and stops dependant providers.
-func (s *Service) waitForDoneAndEndTheWorld() {
+func (s *Base) waitForDoneAndEndTheWorld() {
 	defer s.done()
 
 	logger := zerolog.Ctx(s.Ctx)
@@ -123,37 +123,37 @@ func (s *Service) waitForDoneAndEndTheWorld() {
 
 // Setters
 func WithMetaInfo(meta *meta.Data) Setter {
-	return func(s *Service) {
+	return func(s *Base) {
 		s.meta = meta
 	}
 }
 
 func WithName(name string) Setter {
-	return func(s *Service) {
-		s.Name = name
+	return func(s *Base) {
+		s.meta.Name = name
 	}
 }
 
 func WithKind(kind string) Setter {
-	return func(s *Service) {
-		s.Kind = kind
+	return func(s *Base) {
+		s.meta.Kind = kind
 	}
 }
 
 func WithAddr(addr *string) Setter {
-	return func(s *Service) {
+	return func(s *Base) {
 		s.Addr = addr
 	}
 }
 
 func WithOtelProvider(p *obs.OtelProvider) Setter {
-	return func(s *Service) {
+	return func(s *Base) {
 		s.OtelProvider = p
 	}
 }
 
 func WithContext(ctx context.Context) Setter {
-	return func(s *Service) {
+	return func(s *Base) {
 		s.Ctx = ctx
 	}
 }
