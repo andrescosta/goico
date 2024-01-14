@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/andrescosta/goico/pkg/wasm/wazero"
@@ -105,14 +106,14 @@ func Test(t *testing.T) {
 	dir := t.TempDir()
 	ctx := context.Background()
 	runtime, err := wazero.NewWasmRuntime(ctx, dir)
+	if err != nil {
+		t.Fatalf("not expected error: %v", err)
+	}
 	defer func() {
 		runtime.Close(ctx)
 	}()
 	for _, s := range scenarios {
 		t.Run(s.name(), func(t *testing.T) {
-			if err != nil {
-				t.Fatalf("not expected error: %v", err)
-			}
 			m, err := wazero.NewWasmModuleString(ctx, runtime, s.wasm(), "event", s.logFn())
 			if err != nil {
 				t.Fatalf("not expected error: %v", err)
@@ -126,6 +127,80 @@ func Test(t *testing.T) {
 			s.validate(t, code, str)
 		})
 	}
+}
+
+func TestParalel(t *testing.T) {
+	dir := t.TempDir()
+	ctx := context.Background()
+	runtime, err := wazero.NewWasmRuntime(ctx, dir)
+	if err != nil {
+		t.Fatalf("not expected error: %v", err)
+	}
+	defer func() {
+		runtime.Close(ctx)
+	}()
+
+	wgready := sync.WaitGroup{}
+	wg := sync.WaitGroup{}
+
+	scenarios := []scenario{
+		&scenarioresult{
+			config:    config{"test_ok", echo},
+			inputdata: inputdata{"test_ok", 0},
+		},
+		&scenarioresult{
+			config:    config{"test_error", echo},
+			inputdata: inputdata{"test_error", 500},
+		},
+		&scenariopanic{
+			config:    config{"test_error", panicw},
+			inputdata: inputdata{"test_error", 500},
+		},
+		&scenariolog{
+			config:    config{"log", logw},
+			inputdata: inputdata{"log_ok_", 10},
+			logsexpected: []logvalue{
+				{message: "_nolevel", lvl: 6},
+				{message: "_info", lvl: 1},
+				{message: "_debug", lvl: 0},
+				{message: "_warn", lvl: 2},
+				{message: "_error", lvl: 3},
+				{message: "_fatal", lvl: 4},
+				{message: "_panic", lvl: 5},
+			},
+			logs: make(map[string]logvalue),
+		},
+		&scenariolog{
+			config:       config{"log_nook", logw},
+			inputdata:    inputdata{"log_ok_", 10},
+			logsexpected: nil,
+		},
+	}
+
+	for _, s := range scenarios {
+		wg.Add(1)
+		wgready.Add(1)
+		go func(s scenario) {
+			defer wg.Done()
+			t.Run(s.name()+"_paralel", func(t *testing.T) {
+				m, err := wazero.NewWasmModuleString(ctx, runtime, s.wasm(), "event", s.logFn())
+				if err != nil {
+					t.Errorf("not expected error: %v", err)
+					return
+				}
+				t.Cleanup(func() {
+					m.Close(ctx)
+				})
+				id, msg := s.input()
+				wgready.Done()
+				wgready.Wait()
+				code, str, err := m.ExecuteMainFunc(ctx, id, msg)
+				s.validateError(t, err)
+				s.validate(t, code, str)
+			})
+		}(s)
+	}
+	wg.Wait()
 }
 
 func (s *scenariolog) log(_ context.Context, id, lvl uint32, message string) error {
