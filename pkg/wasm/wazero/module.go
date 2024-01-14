@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"time"
 	"unsafe"
 
+	"github.com/andrescosta/goico/pkg/env"
 	"github.com/rs/zerolog"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -64,7 +66,7 @@ func NewWasmModuleString(ctx context.Context, runtime *WasmRuntime, wasmModule [
 	ver := TypeDefault
 	verFunc := module.ExportedFunction("ver")
 	if verFunc != nil {
-		v, err := verFunc.Call(ctx)
+		v, err := call(ctx, verFunc)
 		if err == nil {
 			ver = ModuleType(v[0])
 		}
@@ -81,7 +83,7 @@ func NewWasmModuleString(ctx context.Context, runtime *WasmRuntime, wasmModule [
 
 	wm.FreeAdpter = wm.free
 	// Call the init function to initialize the module
-	_, err = initf.Call(ctx)
+	_, err = call(ctx, initf)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +92,9 @@ func NewWasmModuleString(ctx context.Context, runtime *WasmRuntime, wasmModule [
 
 func (f *WasmModuleString) free(ctx context.Context, ptr, size uint64) ([]uint64, error) {
 	if f.ver == TypeDefault {
-		return f.freeFunc.Call(ctx, ptr)
+		return call(ctx, f.freeFunc, ptr)
 	}
-	return f.freeFunc.Call(ctx, ptr, size)
+	return call(ctx, f.freeFunc, ptr, size)
 }
 
 func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, id uint32, data string) (uint64, string, error) {
@@ -120,7 +122,15 @@ func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, id uint32, data 
 	}()
 	logger.Debug().Msg("calling main method")
 	// The result of the call will be stored in struct pointed by resultFuncPtr
-	_, err = f.mainFunc.Call(ctx, resultFuncPtr, api.EncodeU32(id), funcParameterPtr, funcParameterSize)
+
+	// go func() {
+	// 	time.Sleep(20 * time.Second)
+	// 	if err := f.module.CloseWithExitCode(ctx, 1); err != nil {
+	// 		log.Panicln(err)
+	// 	}
+	// }()
+	timeout := env.Duration("wasm.timeout", 2*time.Minute)
+	_, err = callWithTimeout(ctx, f.mainFunc, *timeout, resultFuncPtr, api.EncodeU32(id), funcParameterPtr, funcParameterSize)
 	if err != nil {
 		return 0, "", err
 	}
@@ -130,10 +140,19 @@ func (f *WasmModuleString) ExecuteMainFunc(ctx context.Context, id uint32, data 
 	}
 	return code, res, nil
 }
+func call(ctx context.Context, f api.Function, params ...uint64) ([]uint64, error) {
+	return callWithTimeout(ctx, f, 5*time.Second, params...)
+}
+
+func callWithTimeout(ctx context.Context, f api.Function, timeout time.Duration, params ...uint64) ([]uint64, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return f.Call(ctx, params...)
+}
 
 func (f *WasmModuleString) reserveMemoryForResult(ctx context.Context) (uint64, uint64, error) {
 	eventDataSize := uint64(unsafe.Sizeof(EventFuncResult{}))
-	results, err := f.mallocFunc.Call(ctx, eventDataSize)
+	results, err := call(ctx, f.mallocFunc, eventDataSize)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -143,7 +162,7 @@ func (f *WasmModuleString) reserveMemoryForResult(ctx context.Context) (uint64, 
 
 func (f *WasmModuleString) writeParameterToMemory(ctx context.Context, eventData string) (uint64, uint64, error) {
 	eventDataSize := uint64(len(eventData))
-	results, err := f.mallocFunc.Call(ctx, eventDataSize)
+	results, err := call(ctx, f.mallocFunc, eventDataSize)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -207,9 +226,9 @@ func (f *WasmModuleString) logForExport(ctx context.Context, m api.Module, id, l
 	}
 }
 
-func (f *WasmModuleString) Close(ctx context.Context) {
-	logger := zerolog.Ctx(ctx)
+func (f *WasmModuleString) Close(ctx context.Context) error {
 	if err := f.module.Close(ctx); err != nil {
-		logger.Err(err).Msg("error closing wasm runtime.")
+		return err
 	}
+	return nil
 }

@@ -2,13 +2,12 @@ package httptest
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
+	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/service"
 	httpsvc "github.com/andrescosta/goico/pkg/service/http"
 	"github.com/gorilla/mux"
@@ -26,16 +25,6 @@ type Service struct {
 	Client    *http.Client
 	Servedone <-chan error
 	Cancel    context.CancelFunc
-}
-
-func SetArgsV(name string, value string) {
-	os.Args = append(os.Args, fmt.Sprintf("--env:%s=%s", name, value))
-}
-
-func SetArgs(args []string) {
-	for _, arg := range args {
-		os.Args = append(os.Args, fmt.Sprintf("--env:%s", arg))
-	}
 }
 
 func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthCheckFn, stackLevel httpsvc.StackLevel) (*Service, error) {
@@ -69,10 +58,10 @@ func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthC
 
 func SetHTTPServerTimeouts(t time.Duration) {
 	timeout := t.String()
-	SetArgsV("http.timeout.write", timeout)
-	SetArgsV("http.timeout.read", timeout)
-	SetArgsV("http.timeout.idle", timeout)
-	SetArgsV("http.timeout.handler", timeout)
+	env.SetArgsV("http.timeout.write", timeout)
+	env.SetArgsV("http.timeout.read", timeout)
+	env.SetArgsV("http.timeout.idle", timeout)
+	env.SetArgsV("http.timeout.handler", timeout)
 }
 
 func NewSidecar(ctx context.Context, hfn httpsvc.HealthCheckFn) (*Service, error) {

@@ -488,9 +488,9 @@ func decodejson(b []byte, d any) error {
 
 func setEnv(e []string) {
 	if e != nil {
-		httptest.SetArgs(e)
+		env.SetArgs(e...)
 		return
 	}
-	httptest.SetArgs([]string{"metadata.enabled=true"})
+	env.SetArgs("metadata.enabled=true")
 	httptest.SetHTTPServerTimeouts(1 * time.Second)
 }

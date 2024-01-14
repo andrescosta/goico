@@ -154,6 +154,16 @@ func ElemInWorkDir(elem ...string) (ret string) {
 	return
 }
 
+func SetArgsV(name string, value string) {
+	os.Args = append(os.Args, fmt.Sprintf("--env:%s=%s", name, value))
+}
+
+func SetArgs(args ...string) {
+	for _, arg := range args {
+		os.Args = append(os.Args, fmt.Sprintf("--env:%s", arg))
+	}
+}
+
 func load(override bool, files ...string) (err error) {
 	for _, f := range files {
 		if override {
