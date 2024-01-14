@@ -1,4 +1,4 @@
-package wazero_test
+package wasm_test
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrescosta/goico/pkg/wasm/wazero"
+	"github.com/andrescosta/goico/pkg/execs/wasm"
 )
 
 //go:embed testdata/log.wasm
@@ -32,7 +32,7 @@ type (
 		name() string
 		input() (uint32, string)
 		wasm() []byte
-		logFn() wazero.LogExt
+		logFn() wasm.LogFn
 		validate(*testing.T, uint64, string)
 		validateError(*testing.T, error)
 	}
@@ -114,7 +114,7 @@ func Test(t *testing.T) {
 	}
 	dir := t.TempDir()
 	ctx := context.Background()
-	runtime, err := wazero.NewWasmRuntime(dir)
+	runtime, err := wasm.NewRuntime(dir)
 	if err != nil {
 		t.Fatalf("not expected error: %v", err)
 	}
@@ -124,7 +124,7 @@ func Test(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.name(), func(t *testing.T) {
 			t.Setenv("wasm.timeout", (2 * time.Second).String())
-			m, err := wazero.NewWasmModuleString(ctx, runtime, s.wasm(), "event", s.logFn())
+			m, err := wasm.NewModule(ctx, runtime, s.wasm(), "event", s.logFn())
 			if err != nil {
 				t.Fatalf("not expected error: %v", err)
 			}
@@ -134,7 +134,7 @@ func Test(t *testing.T) {
 			id, msg := s.input()
 			ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 			defer cancel()
-			code, str, err := m.ExecuteMainFunc(ctx, id, msg)
+			code, str, err := m.Execute(ctx, id, msg)
 			s.validateError(t, err)
 			s.validate(t, code, str)
 		})
@@ -144,7 +144,7 @@ func Test(t *testing.T) {
 func TestParalel(t *testing.T) {
 	dir := t.TempDir()
 	ctx := context.Background()
-	runtime, err := wazero.NewWasmRuntime(dir)
+	runtime, err := wasm.NewRuntime(dir)
 	if err != nil {
 		t.Fatalf("not expected error: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestParalel(t *testing.T) {
 			t.Run(s.name()+"_parallel", func(t *testing.T) {
 				_, ok := os.LookupEnv("wasm.timeout")
 				print(ok)
-				m, err := wazero.NewWasmModuleString(ctx, runtime, s.wasm(), "event", s.logFn())
+				m, err := wasm.NewModule(ctx, runtime, s.wasm(), "event", s.logFn())
 				if err != nil {
 					t.Errorf("not expected error: %v", err)
 					return
@@ -217,7 +217,7 @@ func TestParalel(t *testing.T) {
 				wgready.Done()
 				wgready.Wait()
 				ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-				code, str, err := m.ExecuteMainFunc(ctx, id, msg)
+				code, str, err := m.Execute(ctx, id, msg)
 				cancel()
 				s.validateError(t, err)
 				s.validate(t, code, str)
@@ -293,7 +293,7 @@ func (i *inputdata) input() (uint32, string) {
 	return i.code, i.message
 }
 
-func (s *scenariolog) logFn() wazero.LogExt {
+func (s *scenariolog) logFn() wasm.LogFn {
 	return s.log
 }
 
@@ -305,7 +305,7 @@ func (c *config) name() string {
 	return c.names
 }
 
-func (*defaultlog) logFn() wazero.LogExt {
+func (*defaultlog) logFn() wasm.LogFn {
 	return log
 }
 
