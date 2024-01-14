@@ -319,15 +319,15 @@ func TestDirs(t *testing.T) {
 	})
 	tempDir := t.TempDir()
 	initializeDirVars(tempDir)
-	workDir := env.WorkDir()
+	workDir := env.Workdir()
 	if workDir != tempDir {
 		t.Errorf("work dir is different %s - %s", tempDir, workDir)
 	}
-	baseDir := env.BaseDir()
+	baseDir := env.Basedir()
 	if baseDir != tempDir {
 		t.Errorf("base dir is different %s - %s", tempDir, workDir)
 	}
-	m := env.ElemInWorkDir("mydir")
+	m := env.WorkdirPlus("mydir")
 	l := filepath.Join(tempDir, "mydir")
 	if m != l {
 		t.Errorf("dirs are different %s - %s", m, l)

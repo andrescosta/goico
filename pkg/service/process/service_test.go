@@ -249,10 +249,10 @@ func (c config) env() []string { return c.envv }
 
 func setEnv(e []string) {
 	if e != nil {
-		httptest.SetArgs(e)
+		env.Setargs(e...)
 		return
 	}
-	httptest.SetArgs([]string{"metadata.enabled=true"})
+	env.Setargs("metadata.enabled=true")
 	httptest.SetHTTPServerTimeouts(1 * time.Second)
 }
 

@@ -249,7 +249,7 @@ func TestLogToConsole(t *testing.T) {
 			"test_debug_nofile",
 			"test_debug_nofile",
 			func(t *testing.T, s string) {
-				file := filepath.Join(env.WorkDir(), "console_debug_nofile.log")
+				file := filepath.Join(env.Workdir(), "console_debug_nofile.log")
 				e, err := ioutil.FileExists(file)
 				if err != nil {
 					t.Errorf("ioutil.FileExists: %s", err)
@@ -273,7 +273,7 @@ func TestLogToConsole(t *testing.T) {
 			"test_debug_nofile",
 			"test_debug_nofile",
 			func(t *testing.T, s string) {
-				file := filepath.Join(env.WorkDir(), "console_debug_file.log")
+				file := filepath.Join(env.Workdir(), "console_debug_file.log")
 				e, err := ioutil.FileExists(file)
 				if err != nil {
 					t.Errorf("ioutil.FileExists: %s", err)
@@ -413,7 +413,7 @@ func setEnvs(envs []string) {
 
 func setTempDir(tempDir string) {
 	os.Setenv(env.WorkDirVar, tempDir)
-	os.Setenv(env.BaseDir(), tempDir)
+	os.Setenv(env.Basedir(), tempDir)
 }
 
 func buildContextMap(context []string) map[string]string {

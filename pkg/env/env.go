@@ -138,28 +138,38 @@ func Load(name string) error {
 	return nil
 }
 
-func WorkDir() string {
+func Workdir() string {
 	defaultDir := fmt.Sprint(".", string(os.PathSeparator))
 	return String(WorkDirVar, defaultDir)
 }
 
-func BaseDir() string {
+func Basedir() string {
 	defaultDir := fmt.Sprint(".", string(os.PathSeparator))
 	return String(BaseDirVar, defaultDir)
 }
 
-func ElemInWorkDir(elem ...string) (ret string) {
-	elem = append([]string{WorkDir()}, elem...)
+func WorkdirPlus(elem ...string) (ret string) {
+	elem = append([]string{Workdir()}, elem...)
 	ret = filepath.Join(elem...)
 	return
+}
+
+func SetargsV(name string, value string) {
+	os.Args = append(os.Args, fmt.Sprintf("--env:%s=%s", name, value))
+}
+
+func Setargs(args ...string) {
+	for _, arg := range args {
+		os.Args = append(os.Args, fmt.Sprintf("--env:%s", arg))
+	}
 }
 
 func load(override bool, files ...string) (err error) {
 	for _, f := range files {
 		if override {
-			err = godotenv.Overload(filepath.Join(BaseDir(), f))
+			err = godotenv.Overload(filepath.Join(Basedir(), f))
 		} else {
-			err = godotenv.Load(filepath.Join(BaseDir(), f))
+			err = godotenv.Load(filepath.Join(Basedir(), f))
 		}
 		if err != nil {
 			return
