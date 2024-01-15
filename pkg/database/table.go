@@ -1,148 +1,181 @@
 package database
 
 import (
-	"fmt"
+	"errors"
 
-	bolt "go.etcd.io/bbolt"
+	"github.com/cockroachdb/pebble"
 )
 
-type NoTableError struct {
-	table string
-}
-
-func (n NoTableError) Error() string {
-	return fmt.Sprintf("%s does not exist.", n.table)
+type Key struct {
+	version []byte
+	tenant  []byte
+	table   []byte
+	id      []byte
 }
 
 type Marshaler[S any] interface {
 	Marshal(S) (string, []byte, error)
 	Unmarshal([]byte) (S, error)
 }
+
 type Table[S any] struct {
 	db        *Database
 	marshaler Marshaler[S]
 	Name      string
+	Tenant    string
 }
 
-func NewTable[S any](db *Database, name string, marshaler Marshaler[S]) *Table[S] {
+// func NewTable[S any](db *Database, tenant string, name string, marshaler Marshaler[S]) *Table[S] {
+// 	table := &Table[S]{
+// 		marshaler: marshaler,
+// 		Name:      name,
+// 		Tenant:    tenant,
+// 		db:        db,
+// 	}
+// 	return table
+// }
+
+func NewTable[S any](db *Database, name string, tenant string, marshaler Marshaler[S]) *Table[S] {
 	table := &Table[S]{
 		marshaler: marshaler,
 		Name:      name,
+		Tenant:    tenant,
 		db:        db,
 	}
 	return table
 }
 
-func CreateTableIfNotExist[S any](db *Database, name string, marshaler Marshaler[S]) (*Table[S], error) {
-	table := NewTable(db, name, marshaler)
-	if err := db.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(table.Name))
-		return err
-	}); err != nil {
-		return nil, err
-	}
-	return table, nil
-}
-
 func (s *Table[S]) Add(data S) error {
-	if err := s.db.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(s.Name))
-		if b == nil {
-			return NoTableError{s.Name}
-		}
-		var err error
-		id, buf, err := s.marshaler.Marshal(data)
-		if err != nil {
-			return err
-		}
-		if err = b.Put([]byte(id), buf); err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
+	id, buf, err := s.marshaler.Marshal(data)
+	if err != nil {
 		return err
 	}
-	return nil
+	k := s.getKey(id)
+	return s.db.db.Set(k.encode(), buf, pebble.Sync)
 }
 
 func (s *Table[S]) Update(data S) error {
-	if err := s.db.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(s.Name))
-		if b == nil {
-			return NoTableError{s.Name}
-		}
-		var err error
-		id, buf, err := s.marshaler.Marshal(data)
-		if err != nil {
-			return err
-		}
-		if err = b.Put([]byte(id), buf); err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
+	id, buf, err := s.marshaler.Marshal(data)
+	if err != nil {
 		return err
 	}
-	return nil
+	k := s.getKey(id)
+	return s.db.db.Set(k.encode(), buf, pebble.Sync)
 }
 
 func (s *Table[S]) Delete(id string) error {
-	if err := s.db.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(s.Name))
-		if b == nil {
-			return NoTableError{s.Name}
-		}
-		if err := b.Delete([]byte(id)); err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
-	return nil
+	k := s.getKey(id)
+	return s.db.db.Delete(k.encode(), pebble.Sync)
 }
 
 func (s *Table[S]) Get(id string) (*S, error) {
-	var data *S
-	if err := s.db.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(s.Name))
-		if b == nil {
-			return NoTableError{s.Name}
+	k := s.getKey(id)
+	d, iter, err := s.db.db.Get(k.encode())
+	if err != nil {
+		if errors.Is(err, pebble.ErrNotFound) {
+			return nil, nil
 		}
-		d := b.Get([]byte(id))
-		if d != nil {
-			e, err := s.marshaler.Unmarshal(d)
-			if err != nil {
-				return err
-			}
-			data = &e
-		}
-		return nil
-	}); err != nil {
 		return nil, err
 	}
-	return data, nil
+	errs := make([]error, 0)
+	e, err := s.marshaler.Unmarshal(d)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if err := iter.Close(); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
+	return &e, nil
 }
 
 func (s *Table[S]) All() ([]S, error) {
 	var data []S
 	data = make([]S, 0)
-	if err := s.db.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(s.Name))
-		if b == nil {
-			return NoTableError{s.Name}
-		}
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			d, err := s.marshaler.Unmarshal(v)
-			if err != nil {
-				return err
+
+	k := s.getKey("")
+
+	keyUpperBound := func(b []byte) []byte {
+		end := make([]byte, len(b))
+		copy(end, b)
+		for i := len(end) - 1; i >= 0; i-- {
+			end[i] = end[i] + 1
+			if end[i] != 0 {
+				return end[:i+1]
 			}
-			data = append(data, d)
 		}
-		return nil
-	}); err != nil {
-		return nil, err
+		return nil // no upper-bound
+	}
+
+	prefixIterOptions := func(prefix []byte) *pebble.IterOptions {
+		return &pebble.IterOptions{
+			LowerBound: prefix,
+			UpperBound: keyUpperBound(prefix),
+		}
+	}
+	errs := make([]error, 0)
+	iter := s.db.db.NewIter(prefixIterOptions(k.encodepreffix()))
+	for iter.First(); iter.Valid(); iter.Next() {
+		d, err := s.marshaler.Unmarshal(iter.Value())
+		if err != nil {
+			errs = append(errs, err)
+			break
+		}
+		data = append(data, d)
+	}
+	if err := iter.Close(); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 	return data, nil
+}
+
+func (s *Table[S]) getKey(id string) *Key {
+	return &Key{
+		version: []byte("0"),
+		tenant:  []byte(s.Tenant),
+		table:   []byte(s.Name),
+		id:      []byte(id),
+	}
+}
+
+func (k *Key) encode() []byte {
+	d := make([]byte, k.len())
+	n := 0
+	copy(d[n:], k.version)
+	n = n + len(k.version)
+	copy(d[n:], k.tenant)
+	n = n + len(k.tenant)
+	copy(d[n:], k.table)
+	n = n + len(k.table)
+	copy(d[n:], k.id)
+	return d
+}
+
+func (k *Key) encodepreffix() []byte {
+	d := make([]byte, k.lenpreffix())
+	n := 0
+	copy(d[n:], k.version)
+	n = n + len(k.version)
+	copy(d[n:], k.tenant)
+	n = n + len(k.tenant)
+	copy(d[n:], k.table)
+	return d
+}
+
+func (k *Key) len() int {
+	return len(k.version) +
+		len(k.tenant) +
+		len(k.table) +
+		len(k.id)
+}
+
+func (k *Key) lenpreffix() int {
+	return len(k.version) +
+		len(k.tenant) +
+		len(k.table)
 }

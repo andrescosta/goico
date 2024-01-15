@@ -19,6 +19,8 @@ import (
 
 type addresses []address
 
+var tenant = "100"
+
 type (
 	data struct {
 		Idd       string
@@ -75,9 +77,11 @@ var (
 	fillrandomdata = fillRandomDataStep{}
 )
 
-func TestDatabaseError(t *testing.T) {
-	if _, err := Open("{}\\/empty"); err == nil {
-		t.Errorf("expecting path not found got <nil>")
+func TestPathError(t *testing.T) {
+	t.Parallel()
+	_, err := Open("", &Options{})
+	if err == nil {
+		t.Fatalf("Expected error got <nil>")
 	}
 }
 
@@ -92,49 +96,23 @@ func TestOperations(t *testing.T) {
 		newscenario("getall_and_delete", fillrandomdata, fillrandomdata, add, deleteone, all),
 		newscenario("getall_and_update", fillrandomdata, fillrandomdata, add, update, all),
 	}
-	dbName := filepath.Join(t.TempDir(), "database.md")
-	db, err := Open(dbName)
-	if err != nil {
-		t.Fatalf("Database.Open: %s", err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Errorf("Database.Close: %s", err)
+	ops := []*Options{{}, {InMemory: true}}
+	for _, o := range ops {
+		db, err := Open(filepath.Join(t.TempDir(), "database"), o)
+		if err != nil {
+			t.Fatalf("Database.Open: %s", err)
 		}
-	}()
+		defer func() {
+			if err := db.Close(); err != nil {
+				t.Errorf("Database.Close: %s", err)
+			}
+		}()
 
-	for _, s := range scenarios {
-		t.Run(s.name, func(t *testing.T) {
-			s.execute(t, db)
-		})
-	}
-}
-
-func TestBucketErrors(t *testing.T) {
-	t.Parallel()
-	scenarios := []*scenario{
-		newscenario("add", add),
-		newscenario("get", get),
-		newscenario("delete", deleteone),
-		newscenario("update", update),
-		newscenario("all", all),
-	}
-	dbName := filepath.Join(t.TempDir(), "database-b-error.md")
-	db, err := Open(dbName)
-	if err != nil {
-		t.Fatalf("Database.Open: %s", err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			t.Errorf("Database.Close: %s", err)
+		for _, s := range scenarios {
+			t.Run(s.name, func(t *testing.T) {
+				s.execute(t, db)
+			})
 		}
-	}()
-
-	for _, s := range scenarios {
-		t.Run(s.name, func(t *testing.T) {
-			_ = fillrandomdata.execute(s)
-			s.executeBucketError(t, db)
-		})
 	}
 }
 
@@ -149,7 +127,7 @@ func TestMarshallerError(t *testing.T) {
 	scenariosData := newscenario("data", fillrandomdata, add)
 
 	dbName := filepath.Join(t.TempDir(), "database-m-error.md")
-	db, err := Open(dbName)
+	db, err := Open(dbName, nil)
 	if err != nil {
 		t.Fatalf("Database.Open: %s", err)
 	}
@@ -169,27 +147,9 @@ func TestMarshallerError(t *testing.T) {
 	}
 }
 
-func (s *scenario) executeBucketError(t *testing.T, db *Database) {
-	marshaller := BinaryMarshaller[data]{}
-	s.table = NewTable(db, "any", marshaller)
-	for _, step := range s.steps {
-		err := step.execute(s)
-		if !errors.As(err, &NoTableError{}) {
-			t.Errorf("expected database.NoTableError got %s", err)
-			return
-		}
-		if err.Error() == "" {
-			t.Error("expected error message")
-		}
-	}
-}
-
 func (s *scenario) executeMarshallerError(t *testing.T, db *Database, tableName string) {
 	marshaller := faultyMarshaller[data]{}
-	table, err := CreateTableIfNotExist(db, tableName, marshaller)
-	if err != nil {
-		t.Fatalf("Table.NewTable: %s", err)
-	}
+	table := NewTable(db, tableName, tenant, marshaller)
 	s.table = table
 	for _, step := range s.steps {
 		err := step.execute(s)
@@ -202,11 +162,8 @@ func (s *scenario) executeMarshallerError(t *testing.T, db *Database, tableName 
 
 func (s *scenario) execute(t *testing.T, db *Database) {
 	marshaller := BinaryMarshaller[data]{}
-	tableName := fmt.Sprintf("%s/%s", t.Name(), "table")
-	table, err := CreateTableIfNotExist(db, tableName, marshaller)
-	if err != nil {
-		t.Fatalf("Table.NewTable: %s", err)
-	}
+	tableName := fmt.Sprintf("%s%s", t.Name(), "table")
+	table := NewTable(db, tableName, tenant, marshaller)
 	s.table = table
 	for _, step := range s.steps {
 		if err := step.execute(s); err != nil {
@@ -254,6 +211,9 @@ func (g getStep) execute(s *scenario) error {
 	d, err := s.table.Get(s.memory[0].Idd)
 	if err != nil {
 		return err
+	}
+	if d == nil {
+		return dataIsDifferentError{fmt.Sprintf("expected %s got <nil>", s.memory[0])}
 	}
 	if !reflect.DeepEqual(s.memory[0], *d) {
 		return dataIsDifferentError{fmt.Sprintf("expected %s got %s", s.memory[0], d)}
