@@ -1,22 +1,28 @@
 package database
 
 import (
-	"time"
-
-	bolt "go.etcd.io/bbolt"
+	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/vfs"
 )
 
 type Database struct {
-	db *bolt.DB
+	db *pebble.DB
 }
 
-func Open(path string) (*Database, error) {
-	db, err := bolt.Open(path, 0o600, &bolt.Options{
-		Timeout: 3 * time.Second,
-	})
+type Options struct {
+	InMemory bool
+}
+
+func Open(path string, ops *Options) (*Database, error) {
+	opts := &pebble.Options{}
+	if ops != nil && ops.InMemory {
+		opts.FS = vfs.NewMem()
+	}
+	db, err := pebble.Open(path, opts)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Database{
 		db: db,
 	}, nil
