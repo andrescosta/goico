@@ -1,4 +1,4 @@
-package grpcutil
+package protoutil
 
 import (
 	"reflect"

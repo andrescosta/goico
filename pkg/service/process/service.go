@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/andrescosta/goico/pkg/option"
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/http"
 	"github.com/rs/zerolog"
@@ -19,19 +20,23 @@ type Service struct {
 	sidecarService *http.Service
 }
 
-type Option struct {
+type Option interface {
+	Apply(*Options)
+}
+type Options struct {
 	serveHandler  TypeFn
 	healthCheckFN http.HealthCheckFn
 	ctx           context.Context
 	name          string
 	addr          *string
 	enableSidecar bool
+	listener      service.HTTPListener
 }
 
 func noop(_ context.Context) error { return nil }
 
-func New(opts ...func(*Option)) (*Service, error) {
-	opt := &Option{
+func New(opts ...Option) (*Service, error) {
+	opt := &Options{
 		enableSidecar: true,
 		ctx:           context.Background(),
 		name:          "noop",
@@ -39,7 +44,7 @@ func New(opts ...func(*Option)) (*Service, error) {
 		serveHandler:  noop,
 	}
 	for _, o := range opts {
-		o(opt)
+		o.Apply(opt)
 	}
 	s := &Service{}
 	service, err := service.New(
@@ -58,6 +63,7 @@ func New(opts ...func(*Option)) (*Service, error) {
 		h, err := http.NewSidecar(
 			http.WithPrimaryService(s.base),
 			http.WithHealthCheck[*http.SidecarOptions](opt.healthCheckFN),
+			http.WithListener[*http.SidecarOptions](opt.listener),
 		)
 		if err != nil {
 			return nil, err
@@ -67,22 +73,31 @@ func New(opts ...func(*Option)) (*Service, error) {
 	return s, nil
 }
 
-func (s Service) ServeWithSidecar(listener net.Listener) error {
+func (s Service) Serve() error {
+	l, err := service.DefaultHTTPListener.Listen(*s.base.Addr)
+	if err != nil {
+		return err
+	}
+	return s.DoServe(l)
+}
+
+func (s Service) DoServe(listener net.Listener) error {
+	logger := zerolog.Ctx(s.base.Ctx)
 	if s.sidecarService == nil {
 		return errors.New("sidecar not enabled")
 	}
-	logger := zerolog.Ctx(s.base.Ctx)
 	logger.Info().Msgf("Starting helper service %d ", os.Getpid())
-	go func() {
-		if err := s.sidecarService.DoServe(listener); err != nil {
-			logger.Err(err).Msg("error helper service")
-		}
-	}()
-	return s.Serve()
-}
 
-func (s Service) Serve() error {
-	logger := zerolog.Ctx(s.base.Ctx)
+	if s.sidecarService != nil {
+		logger := zerolog.Ctx(s.base.Ctx)
+		logger.Info().Msgf("Starting helper service %d ", os.Getpid())
+		go func() {
+			if err := s.sidecarService.DoServe(listener); err != nil {
+				logger.Err(err).Msg("error helper service")
+			}
+		}()
+	}
+
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
 	s.base.Started()
 	// [process] blocks until the context is closed
@@ -94,38 +109,44 @@ func (s Service) Serve() error {
 }
 
 // Setters
-func WithName(n string) func(*Option) {
-	return func(h *Option) {
+func WithName(n string) Option {
+	return option.NewFuncOption(func(h *Options) {
 		h.name = n
-	}
+	})
 }
 
-func WithContext(ctx context.Context) func(*Option) {
-	return func(h *Option) {
+func WithContext(ctx context.Context) Option {
+	return option.NewFuncOption(func(h *Options) {
 		h.ctx = ctx
-	}
+	})
 }
 
-func WithEnableSidecar(enableSidecar bool) func(*Option) {
-	return func(h *Option) {
+func WithEnableSidecar(enableSidecar bool) Option {
+	return option.NewFuncOption(func(h *Options) {
 		h.enableSidecar = enableSidecar
-	}
+	})
 }
 
-func WithServeHandler(s func(ctx context.Context) error) func(*Option) {
-	return func(h *Option) {
+func WithServeHandler(s func(ctx context.Context) error) Option {
+	return option.NewFuncOption(func(h *Options) {
 		h.serveHandler = s
-	}
+	})
 }
 
-func WithHealthCheckFN(s http.HealthCheckFn) func(*Option) {
-	return func(h *Option) {
+func WithHealthCheckFN(s http.HealthCheckFn) Option {
+	return option.NewFuncOption(func(h *Options) {
 		h.healthCheckFN = s
-	}
+	})
 }
 
-func WithAddr(addr *string) func(*Option) {
-	return func(h *Option) {
+func WithAddr(addr *string) Option {
+	return option.NewFuncOption(func(h *Options) {
 		h.addr = addr
-	}
+	})
+}
+
+func WithSidecarListener(l service.HTTPListener) Option {
+	return option.NewFuncOption(func(h *Options) {
+		h.listener = l
+	})
 }

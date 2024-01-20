@@ -79,7 +79,7 @@ var (
 
 func TestPathError(t *testing.T) {
 	t.Parallel()
-	_, err := Open("", &Options{})
+	_, err := Open("", Option{})
 	if err == nil {
 		t.Fatalf("Expected error got <nil>")
 	}
@@ -96,7 +96,7 @@ func TestOperations(t *testing.T) {
 		newscenario("getall_and_delete", fillrandomdata, fillrandomdata, add, deleteone, all),
 		newscenario("getall_and_update", fillrandomdata, fillrandomdata, add, update, all),
 	}
-	ops := []*Options{{}, {InMemory: true}}
+	ops := []Option{{}, {InMemory: true}}
 	for _, o := range ops {
 		db, err := Open(filepath.Join(t.TempDir(), "database"), o)
 		if err != nil {
@@ -127,7 +127,7 @@ func TestMarshallerError(t *testing.T) {
 	scenariosData := newscenario("data", fillrandomdata, add)
 
 	dbName := filepath.Join(t.TempDir(), "database-m-error.md")
-	db, err := Open(dbName, nil)
+	db, err := Open(dbName, Option{})
 	if err != nil {
 		t.Fatalf("Database.Open: %s", err)
 	}

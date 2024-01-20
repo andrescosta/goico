@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/andrescosta/goico/pkg/env"
+	"github.com/andrescosta/goico/pkg/option"
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/obs"
 	"github.com/gorilla/mux"
@@ -24,6 +25,7 @@ type Service struct {
 	healthCheckFunc HealthCheckFn
 	pool            *sync.Pool
 	imsidecar       bool
+	listener        service.HTTPListener
 }
 
 type healthStatus struct {
@@ -41,6 +43,14 @@ type SidecarOptions struct {
 	base   *service.Base
 }
 
+type httpOptions interface {
+	*ServiceOptions | *SidecarOptions
+}
+
+type Option[T httpOptions] interface {
+	Apply(T)
+}
+
 type ServiceOptions struct {
 	addr         *string
 	common       *commonOptions
@@ -52,15 +62,17 @@ type ServiceOptions struct {
 type commonOptions struct {
 	healthChkFn       HealthCheckFn
 	stackLevelOnError StackLevel
+	listener          service.HTTPListener
 }
 
-func New(opts ...func(*ServiceOptions)) (*Service, error) {
+func New(opts ...Option[*ServiceOptions]) (*Service, error) {
 	svc := &Service{}
 	setDefaults(svc)
 
 	opt := &ServiceOptions{
 		common: &commonOptions{
 			stackLevelOnError: StackLevelSimple,
+			listener:          service.DefaultHTTPListener,
 		},
 		ctx:          context.Background(),
 		initRoutesFn: func(ctx context.Context, r *mux.Router) error { return nil },
@@ -69,7 +81,7 @@ func New(opts ...func(*ServiceOptions)) (*Service, error) {
 	}
 
 	for _, o := range opts {
-		o(opt)
+		o.Apply(opt)
 	}
 
 	//
@@ -83,7 +95,7 @@ func New(opts ...func(*ServiceOptions)) (*Service, error) {
 		return nil, err
 	}
 	svc.base = base
-
+	svc.listener = opt.common.listener
 	// Mux Router initialization
 	router := svc.initializeRouter(opt.common)
 
@@ -94,7 +106,7 @@ func New(opts ...func(*ServiceOptions)) (*Service, error) {
 	return svc, nil
 }
 
-func NewSidecar(opts ...func(*SidecarOptions)) (*Service, error) {
+func NewSidecar(opts ...Option[*SidecarOptions]) (*Service, error) {
 	svc := &Service{}
 	setDefaults(svc)
 
@@ -103,10 +115,11 @@ func NewSidecar(opts ...func(*SidecarOptions)) (*Service, error) {
 		base:   nil,
 	}
 	for _, o := range opts {
-		o(opt)
+		o.Apply(opt)
 	}
 	svc.base = opt.base
 	svc.imsidecar = true
+	svc.listener = opt.common.listener
 
 	// Mux Router initialization
 	_ = svc.initializeRouter(opt.common)
@@ -114,9 +127,9 @@ func NewSidecar(opts ...func(*SidecarOptions)) (*Service, error) {
 }
 
 func (s *Service) Serve() error {
-	listener, err := net.Listen("tcp", *s.base.Addr)
+	listener, err := s.listener.Listen(*s.base.Addr)
 	if err != nil {
-		return fmt.Errorf("net.Listen: failed to create listener on %s: %w", *s.base.Addr, err)
+		return err
 	}
 	return s.DoServe(listener)
 }
@@ -215,32 +228,32 @@ func setDefaults(s *Service) {
 }
 
 // Setters
-func WithInitRoutesFn(i initRoutesFn) func(*ServiceOptions) {
-	return func(w *ServiceOptions) {
-		w.initRoutesFn = i
-	}
+func WithInitRoutesFn(i initRoutesFn) Option[*ServiceOptions] {
+	return option.NewFuncOption(func(s *ServiceOptions) {
+		s.initRoutesFn = i
+	})
 }
 
-func WithAddr(a *string) func(*ServiceOptions) {
-	return func(r *ServiceOptions) {
-		r.addr = a
-	}
+func WithAddr(a *string) Option[*ServiceOptions] {
+	return option.NewFuncOption(func(s *ServiceOptions) {
+		s.addr = a
+	})
 }
 
-func WithName(n string) func(*ServiceOptions) {
-	return func(r *ServiceOptions) {
-		r.name = n
-	}
+func WithName(n string) Option[*ServiceOptions] {
+	return option.NewFuncOption(func(s *ServiceOptions) {
+		s.name = n
+	})
 }
 
-func WithContext(ctx context.Context) func(*ServiceOptions) {
-	return func(r *ServiceOptions) {
-		r.ctx = ctx
-	}
+func WithContext(ctx context.Context) Option[*ServiceOptions] {
+	return option.NewFuncOption(func(s *ServiceOptions) {
+		s.ctx = ctx
+	})
 }
 
-func WithStackLevelOnError[T *SidecarOptions | *ServiceOptions](lvl StackLevel) func(T) {
-	return func(t T) {
+func WithStackLevelOnError[T *SidecarOptions | *ServiceOptions](lvl StackLevel) Option[T] {
+	return option.NewFuncOption(func(t T) {
 		if t != nil {
 			switch v := any(t).(type) {
 			case *SidecarOptions:
@@ -249,11 +262,11 @@ func WithStackLevelOnError[T *SidecarOptions | *ServiceOptions](lvl StackLevel) 
 				v.common.stackLevelOnError = lvl
 			}
 		}
-	}
+	})
 }
 
-func WithHealthCheck[T *SidecarOptions | *ServiceOptions](healthChkFn HealthCheckFn) func(T) {
-	return func(t T) {
+func WithHealthCheck[T *SidecarOptions | *ServiceOptions](healthChkFn HealthCheckFn) Option[T] {
+	return option.NewFuncOption(func(t T) {
 		if t != nil {
 			switch v := any(t).(type) {
 			case *SidecarOptions:
@@ -262,11 +275,24 @@ func WithHealthCheck[T *SidecarOptions | *ServiceOptions](healthChkFn HealthChec
 				v.common.healthChkFn = healthChkFn
 			}
 		}
-	}
+	})
 }
 
-func WithPrimaryService(svc *service.Base) func(*SidecarOptions) {
-	return func(opts *SidecarOptions) {
+func WithListener[T *SidecarOptions | *ServiceOptions](listener service.HTTPListener) Option[T] {
+	return option.NewFuncOption(func(t T) {
+		if t != nil {
+			switch v := any(t).(type) {
+			case *SidecarOptions:
+				v.common.listener = listener
+			case *ServiceOptions:
+				v.common.listener = listener
+			}
+		}
+	})
+}
+
+func WithPrimaryService(svc *service.Base) Option[*SidecarOptions] {
+	return option.NewFuncOption(func(opts *SidecarOptions) {
 		opts.base = svc
-	}
+	})
 }

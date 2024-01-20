@@ -1,7 +1,6 @@
 package env
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,7 +26,6 @@ var (
 	environment  = Development
 	environments = []string{Development, Production, Test}
 )
-var ErrNoEnvFileLoaded = errors.New(".env files were not found. Configuration was not loaded")
 
 func String(key string, defs ...string) string {
 	s, ok := os.LookupEnv(key)
@@ -95,19 +93,19 @@ func Array(key string, def string) []string {
 // Follows this convention:
 //
 //	https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use
-func Load(name string) error {
+func Load(name string) (bool, error) {
 	loaded := false
 
-	// We call it because "basedir" set
+	// "basedir" set
 	if err := setEnvsUsingCommandLineArgs(); err != nil {
-		return err
+		return false, err
 	}
 	environment = os.Getenv(EnviromentVar)
 	if strings.TrimSpace(environment) == "" {
 		environment = Development
 	} else {
 		if !slices.Contains(environments, environment) {
-			return fmt.Errorf("invalid environment %s", environment)
+			return false, fmt.Errorf("invalid environment %s", environment)
 		}
 	}
 	if err := load(true, ".env."+environment+".local"); err == nil {
@@ -132,10 +130,7 @@ func Load(name string) error {
 		loaded = true
 	}
 
-	if !loaded {
-		return ErrNoEnvFileLoaded
-	}
-	return nil
+	return loaded, nil
 }
 
 func Workdir() string {

@@ -9,13 +9,13 @@ type Database struct {
 	db *pebble.DB
 }
 
-type Options struct {
+type Option struct {
 	InMemory bool
 }
 
-func Open(path string, ops *Options) (*Database, error) {
+func Open(path string, ops Option) (*Database, error) {
 	opts := &pebble.Options{}
-	if ops != nil && ops.InMemory {
+	if ops.InMemory {
 		opts.FS = vfs.NewMem()
 	}
 	db, err := pebble.Open(path, opts)

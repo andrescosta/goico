@@ -6,15 +6,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andrescosta/goico/pkg/service"
+	"github.com/andrescosta/goico/pkg/service/grpc/testing/echo"
+
 	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/service/grpc"
-	"github.com/andrescosta/goico/pkg/service/grpc/testing/echo"
 )
 
 func TestListenNoError(t *testing.T) {
 	localhost := "127.0.0.1:0"
 	ctx, cancel := context.WithCancel(context.Background())
 	svc, err := New(
+		WithListener(service.DefaultGrpcListener),
 		WithName("echo"),
 		WithAddr(&localhost),
 		WithContext(ctx),
@@ -63,6 +66,7 @@ func TestSamePort(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	svc1, err := New(
 		WithName("echo"),
+		WithListener(service.DefaultGrpcListener),
 		WithAddr(&localhost),
 		WithContext(ctx),
 		WithServiceDesc(&echo.Echo_ServiceDesc),
@@ -83,6 +87,7 @@ func TestSamePort(t *testing.T) {
 	svc2, err := New(
 		WithName("echo"),
 		WithAddr(&localhost),
+		WithListener(service.DefaultGrpcListener),
 		WithContext(ctx),
 		WithServiceDesc(&echo.Echo_ServiceDesc),
 		WithNewServiceFn(func(ctx context.Context) (any, error) {
