@@ -12,6 +12,7 @@ import (
 
 	"github.com/andrescosta/goico/pkg/collection"
 	"github.com/andrescosta/goico/pkg/env"
+	"github.com/andrescosta/goico/pkg/test"
 )
 
 type envvs []envv
@@ -294,10 +295,7 @@ func TestLoad(t *testing.T) {
 				t.Errorf("loaded True but env.Load error: %v", err)
 				return
 			}
-			if err != nil {
-				t.Errorf("env.Load: %v", err)
-				return
-			}
+			test.Nil(t, err)
 			for _, en := range s.expected {
 				assertValue(t, en)
 			}
@@ -361,10 +359,8 @@ func TestDefault(t *testing.T) {
 		t.Run(s.name, func(t *testing.T) {
 			initializeScenario(t, s)
 
-			if _, err := env.Load(serviceName); err != nil {
-				t.Errorf("env.Load: %v", err)
-			}
-
+			_, err := env.Load(serviceName)
+			test.Nil(t, err)
 			v := env.String("myserver1", "localhost:7890")
 			if v != "localhost:7890" {
 				t.Errorf("expected localhost:7890 got %s", v)
@@ -419,10 +415,7 @@ func TestInvalid(t *testing.T) {
 			if !loaded && err == nil {
 				t.Errorf("files not loaded")
 			}
-			if err != nil {
-				t.Errorf("env.Load: %v", err)
-			}
-
+			test.Nil(t, err)
 			bo := env.Bool("metrics_i", true)
 			if !bo {
 				t.Errorf("expected invalid value got %t", bo)
@@ -536,10 +529,9 @@ func createEnvFiles(t *testing.T, dir string, files []string) {
 func createEnvFile(t *testing.T, dir string, name string, e envvs) {
 	t.Helper()
 	file := filepath.Join(dir, name)
-	if err := os.WriteFile(file, e.bytes(t),
-		os.ModeAppend); err != nil {
-		t.Fatalf("os.WriteFile: error writing file %s:%s", file, err)
-	}
+	err := os.WriteFile(file, e.bytes(t),
+		os.ModeAppend)
+	test.Nil(t, err, fmt.Sprintf("os.WriteFile: error writing file %s:%s", file, err))
 }
 
 func (e envvs) bytes(t *testing.T) []byte {
@@ -547,9 +539,8 @@ func (e envvs) bytes(t *testing.T) []byte {
 	var v bytes.Buffer
 	for _, ee := range e {
 		s := fmt.Sprintln(ee.string())
-		if _, err := v.WriteString(s); err != nil {
-			t.Fatalf("bytes.Buffer.Write: %s", err)
-		}
+		_, err := v.WriteString(s)
+		test.Nil(t, err)
 	}
 	return v.Bytes()
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/andrescosta/goico/pkg/collection"
+	"github.com/andrescosta/goico/pkg/test"
 
 	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/yamlutil"
@@ -38,9 +39,8 @@ func TestDecodeFile(t *testing.T) {
 		t.Fatalf("os.WriteFile: %s", err)
 	}
 	d := data{}
-	if err := DecodeFile(fileName, &d); err != nil {
-		t.Fatalf("DecodeFile: %s", err)
-	}
+	err := DecodeFile(fileName, &d)
+	test.Nil(t, err)
 	if d.ID != "go-demo-job" {
 		t.Errorf("expected go-demo-job got %s ", d.ID)
 	}
@@ -70,19 +70,15 @@ func TestMarchal(t *testing.T) {
 		Queues: []queue{{"qid_1"}, {"qid_2"}},
 	}
 	m, err := Marshal(&do)
-	if err != nil {
-		t.Fatalf("Marshal %s", err)
-	}
+	test.Nil(t, err)
 	t.Log(m)
 	fileName := filepath.Join(t.TempDir(),
 		"file-marchal.yaml")
-	if err := os.WriteFile(fileName, []byte(*m), os.ModeAppend); err != nil {
-		t.Fatalf("os.WriteFile: %s", err)
-	}
+	err = os.WriteFile(fileName, []byte(*m), os.ModeAppend)
+	test.Nil(t, err)
 	d := data{}
-	if err := DecodeFile(fileName, &d); err != nil {
-		t.Fatalf("DecodeFile: %s", err)
-	}
+	err = DecodeFile(fileName, &d)
+	test.Nil(t, err)
 	if d.ID != "id_1" {
 		t.Errorf("expected id_1 got %s ", d.ID)
 	}
@@ -106,16 +102,13 @@ func TestMarchal(t *testing.T) {
 func TestErrors(t *testing.T) {
 	t.Parallel()
 	d := data{}
-	if err := DecodeFile("myfile.yaml", &d); err == nil {
-		t.Errorf("DecodeFile: expected error got <nil>")
-	}
+	err := DecodeFile("myfile.yaml", &d)
+	test.NotNil(t, err)
 	fileName := filepath.Join(t.TempDir(),
 		"file-errors.yaml")
-	if err := os.WriteFile(fileName, []byte("aaasssdshjk"), os.ModeAppend); err != nil {
-		t.Fatalf("os.WriteFile: %s", err)
-	}
+	err = os.WriteFile(fileName, []byte("aaasssdshjk"), os.ModeAppend)
+	test.Nil(t, err)
 	d = data{}
-	if err := DecodeFile(fileName, &d); err == nil {
-		t.Errorf("DecodeFile: expected error got <nil>")
-	}
+	err = DecodeFile(fileName, &d)
+	test.NotNil(t, err)
 }

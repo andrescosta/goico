@@ -12,6 +12,7 @@ import (
 
 	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/broadcaster"
+	"github.com/andrescosta/goico/pkg/test"
 )
 
 type data struct {
@@ -31,10 +32,7 @@ func TestBroadcasters(t *testing.T) {
 	for i := 0; i < maxListeners; i++ {
 		waitListeners.Add(1)
 		listener, err := b.Subscribe()
-		if err != nil {
-			t.Errorf("Broadcaster.Subscribe: %s", err)
-			return
-		}
+		test.Nil(t, err)
 		go func() {
 			defer waitListeners.Done()
 			<-waiter
@@ -53,14 +51,11 @@ func TestBroadcasters(t *testing.T) {
 		}()
 	}
 	close(waiter)
-	if err := b.WriteSync(newdata); err != nil {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
+	err := b.WriteSync(newdata)
+	test.Nil(t, err)
 	waitListeners.Wait()
-	if err := b.Stop(); err != nil {
-		t.Errorf("Error not expected:%s", err)
-	}
+	err = b.Stop()
+	test.Nil(t, err)
 }
 
 func TestUnsubscribe(t *testing.T) {
@@ -75,10 +70,7 @@ func TestUnsubscribe(t *testing.T) {
 	listeners := make([]*Listener[data], 0)
 	for i := 0; i < maxListeners; i++ {
 		listener, err := b.Subscribe()
-		if err != nil {
-			t.Errorf("Broadcaster.Subscribe: %s", err)
-			return
-		}
+		test.Nil(t, err)
 		tounsusbcribe := i%2 != 0
 		if tounsusbcribe {
 			listeners = append(listeners, listener)
@@ -113,20 +105,15 @@ func TestUnsubscribe(t *testing.T) {
 		}(listener, &waitListeners, !tounsusbcribe)
 	}
 	for _, l := range listeners {
-		if err := b.Unsubscribe(l); err != nil {
-			t.Errorf("Error not expected:%s", err)
-			return
-		}
+		err := b.Unsubscribe(l)
+		test.Nil(t, err)
 	}
 	close(waiter)
-	if err := b.Write(newdata); err != nil {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
+	err := b.Write(newdata)
+	test.Nil(t, err)
 	waitListeners.Wait()
-	if err := b.Stop(); err != nil {
-		t.Errorf("Error not expected:%s", err)
-	}
+	err = b.Stop()
+	test.Nil(t, err)
 }
 
 func TestStopWrite(t *testing.T) {
@@ -140,10 +127,7 @@ func TestStopWrite(t *testing.T) {
 	waiter := make(chan struct{})
 	for i := 0; i < maxListeners; i++ {
 		l, err := b.Subscribe()
-		if err != nil {
-			t.Errorf("Broadcaster.Subscribe: %s", err)
-			return
-		}
+		test.Nil(t, err)
 		waitListeners.Add(1)
 		go func(l *Listener[data], w *sync.WaitGroup) {
 			defer w.Done()
@@ -169,14 +153,10 @@ func TestStopWrite(t *testing.T) {
 		}(l, &waitListeners)
 	}
 	close(waiter)
-	if err := b.Write(newdata); err != nil {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
-	if err := b.Stop(); err != nil {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
+	err := b.Write(newdata)
+	test.Nil(t, err)
+	err = b.Stop()
+	test.Nil(t, err)
 	waitListeners.Wait()
 }
 
@@ -191,10 +171,7 @@ func TestStopWriteSync(t *testing.T) {
 	waiter := make(chan struct{})
 	for i := 0; i < maxListeners; i++ {
 		l, err := b.Subscribe()
-		if err != nil {
-			t.Errorf("Broadcaster.Subscribe: %s", err)
-			return
-		}
+		test.Nil(t, err)
 		waitListeners.Add(1)
 		go func(l *Listener[data], w *sync.WaitGroup) {
 			defer w.Done()
@@ -223,14 +200,10 @@ func TestStopWriteSync(t *testing.T) {
 		}(l, &waitListeners)
 	}
 	close(waiter)
-	if err := b.WriteSync(newdata); err != nil {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
-	if err := b.Stop(); err != nil {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
+	err := b.WriteSync(newdata)
+	test.Nil(t, err)
+	err = b.Stop()
+	test.Nil(t, err)
 	waitListeners.Wait()
 }
 
@@ -241,58 +214,33 @@ func TestStoppedError(t *testing.T) {
 	}
 	b := Start[data](context.Background())
 	l, err := b.Subscribe()
-	if err != nil {
-		t.Errorf("Broadcaster.Subscribe: %s", err)
-		return
-	}
-	if err := b.Stop(); err != nil {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
-	if err := b.Stop(); !errors.Is(err, ErrStopped) {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
-	if err := b.Write(newdata); !errors.Is(err, ErrStopped) {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
-	if err := b.WriteSync(newdata); !errors.Is(err, ErrStopped) {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
-	if err := b.Unsubscribe(l); !errors.Is(err, ErrStopped) {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
-	if _, err := b.Subscribe(); !errors.Is(err, ErrStopped) {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
-	if _, err := b.IsSubscribed(l); !errors.Is(err, ErrStopped) {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
+	test.Nil(t, err)
+	err = b.Stop()
+	test.Nil(t, err)
+	err = b.Stop()
+	test.ErrorNotIs(t, err, ErrStopped)
+	err = b.Write(newdata)
+	test.ErrorNotIs(t, err, ErrStopped)
+	err = b.WriteSync(newdata)
+	test.ErrorNotIs(t, err, ErrStopped)
+	err = b.Unsubscribe(l)
+	test.ErrorNotIs(t, err, ErrStopped)
+	_, err = b.Subscribe()
+	test.ErrorNotIs(t, err, ErrStopped)
+	_, err = b.IsSubscribed(l)
+	test.ErrorNotIs(t, err, ErrStopped)
 }
 
 func TestUnsubscribeUnsubscribe(t *testing.T) {
 	b := Start[data](context.Background())
 	l, err := b.Subscribe()
-	if err != nil {
-		t.Errorf("Broadcaster.Subscribe: %s", err)
-		return
-	}
-	if err := b.Unsubscribe(l); err != nil {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
-	if err := b.Unsubscribe(l); err != nil {
-		t.Errorf("Error not expected:%s", err)
-		return
-	}
-	if err := b.Stop(); err != nil {
-		t.Errorf("Error not expected:%s", err)
-	}
+	test.Nil(t, err)
+	err = b.Unsubscribe(l)
+	test.Nil(t, err)
+	err = b.Unsubscribe(l)
+	test.Nil(t, err)
+	err = b.Stop()
+	test.Nil(t, err)
 }
 
 func TestMultiWriters(t *testing.T) {
