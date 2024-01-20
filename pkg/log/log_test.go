@@ -12,6 +12,7 @@ import (
 
 	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/ioutil"
+	"github.com/andrescosta/goico/pkg/test"
 	"github.com/rs/zerolog"
 
 	//revive:disable-next-line:dot-imports
@@ -251,9 +252,7 @@ func TestLogToConsole(t *testing.T) {
 			func(t *testing.T, s string) {
 				file := filepath.Join(env.Workdir(), "console_debug_nofile.log")
 				e, err := ioutil.FileExists(file)
-				if err != nil {
-					t.Errorf("ioutil.FileExists: %s", err)
-				}
+				test.Nil(t, err)
 				if e {
 					t.Error("console_debug_nofile.log exists")
 				}
@@ -275,9 +274,7 @@ func TestLogToConsole(t *testing.T) {
 			func(t *testing.T, s string) {
 				file := filepath.Join(env.Workdir(), "console_debug_file.log")
 				e, err := ioutil.FileExists(file)
-				if err != nil {
-					t.Errorf("ioutil.FileExists: %s", err)
-				}
+				test.Nil(t, err)
 				if !e {
 					t.Error("console_debug_file.log not exists")
 				}
@@ -317,9 +314,7 @@ func execute(t *testing.T, scenarios []scenario, tempDir string) {
 			var err error
 			if s.types == typeConsole {
 				r, w, err = os.Pipe()
-				if err != nil {
-					t.Fatalf("os.Pipe: %s", err)
-				}
+				test.Nil(t, err)
 				os.Stdout = w
 			}
 			var logger *zerolog.Logger
@@ -329,18 +324,13 @@ func execute(t *testing.T, scenarios []scenario, tempDir string) {
 				logger = New()
 			}
 			logger.WithLevel(s.lvl).Msg(s.text)
-			if err := Close(); err != nil {
-				t.Errorf("log.Close: %s", err)
-			}
+			err = Close()
+			test.Nil(t, err)
 			if s.types == typeConsole {
-				if err := w.Close(); err != nil {
-					t.Errorf("File.Close: %s", err)
-				}
+				err := w.Close()
+				test.Nil(t, err)
 				outb, err := io.ReadAll(r)
-				if err != nil {
-					t.Errorf("io.ReadAll: %s", err)
-					return
-				}
+				test.Nil(t, err)
 				out := string(outb)
 				if s.expected != nil {
 					if *s.expected == "" {
@@ -369,21 +359,15 @@ func execute(t *testing.T, scenarios []scenario, tempDir string) {
 			if s.types == typeFile {
 				fileName := filepath.Join(tempDir, s.fileName)
 				fo, err := os.Open(fileName)
-				if err != nil {
-					t.Errorf("os.Open: %s", err)
-					return
-				}
+				test.Nil(t, err)
 				r = fo
 				defer func() {
-					if err := fo.Close(); err != nil {
-						t.Errorf("os.File %s", err)
-					}
+					err = fo.Close()
+					test.Nil(t, err)
 				}()
 				logLine := logLine{}
-				if err := json.NewDecoder(r).Decode(&logLine); err != nil {
-					t.Errorf("Decode: %s", err)
-					return
-				}
+				err = json.NewDecoder(r).Decode(&logLine)
+				test.Nil(t, err)
 				if s.expected != nil {
 					if *s.expected == "" {
 						if logLine.Message != "" {

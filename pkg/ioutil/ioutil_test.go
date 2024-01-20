@@ -15,6 +15,7 @@ import (
 
 	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/ioutil"
+	"github.com/andrescosta/goico/pkg/test"
 )
 
 // It grants read, write, and execute permissions to the owner and the group
@@ -77,9 +78,7 @@ func TestWriteToRandomFile(t *testing.T) {
 	content := []byte("testing TestWriteToRandomFile")
 
 	f, err := WriteToRandomFile(tempDir, preffix, suffix, content)
-	if err != nil {
-		t.Fatalf("WriteToRandomFile %q : %s", tempDir, err)
-	}
+	test.Nil(t, err, fmt.Sprintf("WriteToRandomFile %q : %s", tempDir, err))
 	if !strings.HasPrefix(filepath.Base(f), preffix) {
 		t.Fatalf("The file name %s does not start with %s", f, preffix)
 	}
@@ -87,9 +86,7 @@ func TestWriteToRandomFile(t *testing.T) {
 		t.Fatalf("The file name %s does not start with %s", f, preffix)
 	}
 	c, err := os.ReadFile(f)
-	if err != nil {
-		t.Fatalf("ReadFile: Error reading the file %s: %s", f, err)
-	}
+	test.Nil(t, err, fmt.Sprintf("ReadFile: Error reading the file %s: %s", f, err))
 	if !bytes.Equal(c, content) {
 		t.Fatalf("Content is different %s %s", c, content)
 	}
@@ -99,19 +96,14 @@ func TestFileExists(t *testing.T) {
 	t.Parallel()
 	fileName := tempRandomFileName(t)
 	ok, err := FileExists(fileName)
-	if err != nil {
-		t.Fatalf("FileExists: %s ", err)
-	}
+	test.Nil(t, err)
 	if ok {
 		t.Fatalf("The file should not exists: %s ", fileName)
 	}
-	if err := os.WriteFile(fileName, []byte("content"), os.ModeAppend); err != nil {
-		t.Fatalf("FileExists: %s ", err)
-	}
+	err = os.WriteFile(fileName, []byte("content"), os.ModeAppend)
+	test.Nil(t, err)
 	ok, err = FileExists(fileName)
-	if err != nil {
-		t.Fatalf("FileExists: %s ", err)
-	}
+	test.Nil(t, err)
 	if !ok {
 		t.Fatalf("The file does not exists: %s ", fileName)
 	}
@@ -121,13 +113,9 @@ func TestTouch(t *testing.T) {
 	t.Parallel()
 	fileName := tempRandomFileName(t)
 	err := Touch(fileName)
-	if err != nil {
-		t.Fatalf("ioutil.Touch: %s ", err)
-	}
+	test.Nil(t, err)
 	c, err := os.ReadFile(fileName)
-	if err != nil {
-		t.Fatalf("os.ReadFile: %s ", err)
-	}
+	test.Nil(t, err)
 	if len(c) > 0 {
 		t.Fatalf("The file is not empty: %s", c)
 	}
@@ -138,12 +126,8 @@ func TestFiles(t *testing.T) {
 	makeTestTree(t, rootTree, tempDir, nil)
 	dir := filepath.Join(tempDir, rootTree.name)
 	files, err := Files(dir)
-	if err != nil {
-		t.Fatalf("ioutil.Files: error getting files %s", err)
-	}
-	if len(files) == 0 {
-		t.Fatalf("Files not found for dir %s", dir)
-	}
+	test.Nil(t, err)
+	test.NotEmpty(t, files)
 	for _, f := range files {
 		if f.IsDir() {
 			t.Fatalf("%s is a directory", f.Name())
@@ -163,12 +147,8 @@ func TestDirs(t *testing.T) {
 	tempDir := t.TempDir()
 	makeTestTree(t, rootTree, tempDir, nil)
 	files, err := Dirs(tempDir)
-	if err != nil {
-		t.Fatalf("ioutil.Dirs: error getting dirs %s", err)
-	}
-	if len(files) == 0 {
-		t.Fatalf("Dirs not found for dir %s", tempDir)
-	}
+	test.Nil(t, err)
+	test.NotEmpty(t, files)
 	for _, f := range files {
 		if !f.IsDir() {
 			t.Fatalf("%s is a file", f.Name())
@@ -188,12 +168,8 @@ func TestNoDirs(t *testing.T) {
 	tempDir := t.TempDir()
 	makeTestTree(t, rootTreeNoDirs, tempDir, nil)
 	files, err := Dirs(tempDir)
-	if err != nil {
-		t.Fatalf("ioutil.Dirs: error getting dirs %s", err)
-	}
-	if len(files) != 0 {
-		t.Fatalf("Dirs were found for dir %s", tempDir)
-	}
+	test.Nil(t, err)
+	test.Empty(t, files)
 }
 
 func TestNoFiles(t *testing.T) {
@@ -201,12 +177,8 @@ func TestNoFiles(t *testing.T) {
 	makeTestTree(t, rootTreeNoFiles, tempDir, nil)
 	dir := filepath.Join(tempDir, rootTree.name)
 	files, err := Files(dir)
-	if err != nil {
-		t.Fatalf("ioutil.Files: error getting files %s", err)
-	}
-	if len(files) != 0 {
-		t.Fatalf("Files were found for dir %s:", tempDir)
-	}
+	test.Nil(t, err)
+	test.Empty(t, files)
 }
 
 func TestReadOldestFile(t *testing.T) {
@@ -215,9 +187,7 @@ func TestReadOldestFile(t *testing.T) {
 	n := getFirstFile(t, rootTree)
 	d, f, err := ReadOldestFile(tempDir, "f", "t")
 	name := filepath.Base(*f)
-	if err != nil {
-		t.Fatalf("ioutil.Files: error getting files %s", err)
-	}
+	test.Nil(t, err)
 	if name != n.name {
 		t.Fatalf("ioutil.Files: expecting %s getting %s", n.name, name)
 	}
@@ -231,12 +201,8 @@ func TestLastLinesNoLfNoEmpty(t *testing.T) {
 	f := tempRandomFileName(t)
 	createFile(t, f, 10, "line", "\n", false)
 	l, err := LastLines(f, 3, true, true)
-	if err != nil {
-		t.Fatalf("ioutil.LastLines: error getting files %s", err)
-	}
-	if len(l) != 3 {
-		t.Fatalf("Expecting 3 got %d", len(l))
-	}
+	test.Nil(t, err)
+	test.NotIsLen(t, l, 3)
 	if l[0] != "line7" {
 		t.Fatalf(`Expecting "line7" got %s`, l[0])
 	}
@@ -253,12 +219,8 @@ func TestLastLinesNoCrLfNoEmpty(t *testing.T) {
 	f := tempRandomFileName(t)
 	createFile(t, f, 10, "line", "\r\n", false)
 	l, err := LastLines(f, 3, true, true)
-	if err != nil {
-		t.Fatalf("ioutil.LastLines: error getting files %s", err)
-	}
-	if len(l) != 3 {
-		t.Fatalf("Expecting 3 got %d", len(l))
-	}
+	test.Nil(t, err)
+	test.NotIsLen(t, l, 3)
 	if l[0] != "line7" {
 		t.Fatalf(`Expecting "line7" got %s`, l[0])
 	}
@@ -275,12 +237,8 @@ func TestLastLinesSmallerEmpty(t *testing.T) {
 	f := tempRandomFileName(t)
 	createFile(t, f, 3, "line", "\r\n", true)
 	l, err := LastLines(f, 10, false, true)
-	if err != nil {
-		t.Fatalf("ioutil.LastLines: error getting files %s", err)
-	}
-	if len(l) != 3 {
-		t.Fatalf("Expecting 3 got %d", len(l))
-	}
+	test.Nil(t, err)
+	test.NotIsLen(t, l, 3)
 	if l[0] != "" {
 		t.Fatalf(`Expecting "" got %s`, l[0])
 	}
@@ -297,12 +255,8 @@ func TestLastLinesLfNoEmpty(t *testing.T) {
 	f := tempRandomFileName(t)
 	createFile(t, f, 10, "line", "\n", false)
 	l, err := LastLines(f, 3, true, false)
-	if err != nil {
-		t.Fatalf("ioutil.LastLines: error getting files %s", err)
-	}
-	if len(l) != 3 {
-		t.Fatalf("Expecting 3 got %d", len(l))
-	}
+	test.Nil(t, err)
+	test.NotIsLen(t, l, 3)
 	if l[0] != "line7\n" {
 		t.Fatalf(`Expecting "line7" got %s`, l[0])
 	}
@@ -319,12 +273,8 @@ func TestLastLinesCrLfNoEmpty(t *testing.T) {
 	f := tempRandomFileName(t)
 	createFile(t, f, 10, "line", "\r\n", false)
 	l, err := LastLines(f, 3, true, false)
-	if err != nil {
-		t.Fatalf("ioutil.LastLines: error getting files %s", err)
-	}
-	if len(l) != 3 {
-		t.Fatalf("Expecting 3 got %d", len(l))
-	}
+	test.Nil(t, err)
+	test.NotIsLen(t, l, 3)
 	if l[0] != "line7\r\n" {
 		t.Fatalf(`Expecting "line7" got %s`, l[0])
 	}
@@ -341,12 +291,8 @@ func TestLastLinesSmallerNoEmpty(t *testing.T) {
 	f := tempRandomFileName(t)
 	createFile(t, f, 2, "line", "\n", false)
 	l, err := LastLines(f, 10, true, false)
-	if err != nil {
-		t.Fatalf("ioutil.LastLines: error getting files %s", err)
-	}
-	if len(l) != 2 {
-		t.Fatalf("Expecting 2 got %d", len(l))
-	}
+	test.Nil(t, err)
+	test.NotIsLen(t, l, 2)
 	if l[0] != "line0\n" {
 		t.Fatalf(`Expecting "line0" got %s`, l[0])
 	}
@@ -360,12 +306,8 @@ func TestLastLinesCrLfEmpty(t *testing.T) {
 	f := tempRandomFileName(t)
 	createFile(t, f, 10, "line", "\r\n", true)
 	l, err := LastLines(f, 5, false, true)
-	if err != nil {
-		t.Fatalf("ioutil.LastLines: error getting files %s", err)
-	}
-	if len(l) != 5 {
-		t.Fatalf("Expecting 2 got %d", len(l))
-	}
+	test.Nil(t, err)
+	test.NotIsLen(t, l, 5)
 	if l[0] != "line5" {
 		t.Fatalf(`Expecting "line0" got %s`, l[0])
 	}
@@ -388,12 +330,8 @@ func TestLastLinesLfEmpty(t *testing.T) {
 	f := tempRandomFileName(t)
 	createFile(t, f, 10, "line", "\n", true)
 	l, err := LastLines(f, 5, false, true)
-	if err != nil {
-		t.Fatalf("ioutil.LastLines: error getting files %s", err)
-	}
-	if len(l) != 5 {
-		t.Fatalf("Expecting 2 got %d", len(l))
-	}
+	test.Nil(t, err)
+	test.NotIsLen(t, l, 5)
 	if l[0] != "line5" {
 		t.Fatalf(`Expecting "line0" got %s`, l[0])
 	}
@@ -416,12 +354,8 @@ func TestLastLinesNoCrLfEmpty(t *testing.T) {
 	f := tempRandomFileName(t)
 	createFile(t, f, 10, "line", "\r\n", true)
 	l, err := LastLines(f, 5, false, false)
-	if err != nil {
-		t.Fatalf("ioutil.LastLines: error getting files %s", err)
-	}
-	if len(l) != 5 {
-		t.Fatalf("Expecting 2 got %d", len(l))
-	}
+	test.Nil(t, err)
+	test.NotIsLen(t, l, 5)
 	if l[0] != "line5\r\n" {
 		t.Fatalf(`Expecting "line0" got %s`, l[0])
 	}
@@ -444,12 +378,8 @@ func TestLastLinesNoLfEmpty(t *testing.T) {
 	f := tempRandomFileName(t)
 	createFile(t, f, 10, "line", "\n", true)
 	l, err := LastLines(f, 5, false, false)
-	if err != nil {
-		t.Fatalf("ioutil.LastLines: error getting files %s", err)
-	}
-	if len(l) != 5 {
-		t.Fatalf("Expecting 2 got %d", len(l))
-	}
+	test.Nil(t, err)
+	test.NotIsLen(t, l, 5)
 	if l[0] != "line5\n" {
 		t.Fatalf(`Expecting "line0" got %s`, l[0])
 	}
@@ -477,9 +407,7 @@ func randomEncodedString(t *testing.T) string {
 	t.Helper()
 	rb := make([]byte, 5)
 	_, err := rand.Read(rb)
-	if err != nil {
-		t.Fatalf("rand.Read: %s ", err)
-	}
+	test.Nil(t, err)
 	return base64.URLEncoding.EncodeToString(rb)
 }
 
@@ -488,18 +416,14 @@ func makeTestTree(t *testing.T, n *node, baseDir string, waiter func()) {
 	entryName := filepath.Join(baseDir, n.name)
 	if n.entries == nil {
 		err := os.WriteFile(entryName, []byte(n.name), os.ModeAppend)
-		if err != nil {
-			t.Fatalf("ioutil.Touch: Error writing %s: %s", n.name, err)
-		}
+		test.Nil(t, err)
 		if waiter != nil {
 			waiter()
 		}
 		return
 	}
 	err := os.Mkdir(entryName, defaultPermission)
-	if err != nil {
-		t.Fatalf("os.Mkdir: Error creating dir %s: %s", n.name, err)
-	}
+	test.Nil(t, err)
 	for _, nn := range n.entries {
 		makeTestTree(t, nn, entryName, waiter)
 	}

@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 
-	"github.com/andrescosta/goico/pkg/service/grpc/grpcutil"
+	"github.com/andrescosta/goico/pkg/service"
 	"google.golang.org/grpc"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -14,8 +14,8 @@ type HelthCheckClient struct {
 	client     healthpb.HealthClient
 }
 
-func NewHelthCheckClient(ctx context.Context, addr string) (*HelthCheckClient, error) {
-	conn, err := grpcutil.Dial(ctx, addr)
+func NewHelthCheckClient(ctx context.Context, addr string, d service.GrpcDialer) (*HelthCheckClient, error) {
+	conn, err := d.Dial(ctx, addr)
 	if err != nil {
 		return nil, err
 	}

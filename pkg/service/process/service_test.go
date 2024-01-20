@@ -159,11 +159,11 @@ func (s healthCheck) exec(t *testing.T, url string) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if !s.health.HasErrors && resp.StatusCode != http.StatusOK {
-		t.Errorf("expected a status code of %d, got %d", http.StatusOK, resp.StatusCode)
+		t.Errorf("expected status code of %d, got %d", http.StatusOK, resp.StatusCode)
 		return
 	}
 	if s.health.HasErrors && resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("expected a status code of %d, got %d", http.StatusOK, resp.StatusCode)
+		t.Errorf("expected status code of %d, got %d", http.StatusOK, resp.StatusCode)
 		return
 	}
 	rbody, err := io.ReadAll(resp.Body)
@@ -196,6 +196,7 @@ func run(t *testing.T, ss []scenario) {
 			ctx, cancel := context.WithCancel(context.Background())
 			started := make(chan bool, 1)
 			proc, err := process.New(
+				// process.WithSidecarListener(service.DefaultHttpListener),
 				process.WithContext(ctx),
 				process.WithName("executor"),
 				process.WithAddr(&localhost),
@@ -225,7 +226,7 @@ func run(t *testing.T, ss []scenario) {
 			url := "http://" + listener.Addr().String()
 			errorsvc := make(chan error)
 			go func() {
-				errorsvc <- proc.ServeWithSidecar(listener)
+				errorsvc <- proc.DoServe(listener)
 			}()
 			st := <-started
 			if !st {

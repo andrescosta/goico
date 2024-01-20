@@ -15,15 +15,25 @@ func NewSyncMap[T comparable, S any]() *SyncMap[T, S] {
 }
 
 func (s *SyncMap[T, S]) Swap(k T, v S) {
-	s.Delete(k)
-	s.Store(k, v)
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	delete(s.mmap, k)
+	s.mmap[k] = v
+}
+
+func (s *SyncMap[T, S]) LoadOrStore(k T, v S) S {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	va, ok := s.mmap[k]
+	if !ok {
+		va = v
+		s.mmap[k] = va
+	}
+	return va
 }
 
 func (s *SyncMap[T, S]) Store(k T, v S) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.mmap[k] = v
+	s.Swap(k, v)
 }
 
 func (s *SyncMap[T, S]) Load(k T) (S, bool) {

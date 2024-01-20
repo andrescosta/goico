@@ -3,7 +3,7 @@ package svcmeta
 import (
 	"context"
 
-	"github.com/andrescosta/goico/pkg/service/grpc/grpcutil"
+	"github.com/andrescosta/goico/pkg/service"
 	rpc "google.golang.org/grpc"
 )
 
@@ -13,8 +13,8 @@ type InfoClient struct {
 	client     GrpcMetadataClient
 }
 
-func NewInfoClient(ctx context.Context, target string) (*InfoClient, error) {
-	conn, err := grpcutil.Dial(ctx, target)
+func NewInfoClient(ctx context.Context, addr string, d service.GrpcDialer) (*InfoClient, error) {
+	conn, err := d.Dial(ctx, addr)
 	if err != nil {
 		return nil, err
 	}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/andrescosta/goico/pkg/execs/wasm"
+	"github.com/andrescosta/goico/pkg/test"
 )
 
 //go:embed testdata/log.wasm
@@ -115,9 +116,7 @@ func Test(t *testing.T) {
 	dir := t.TempDir()
 	ctx := context.Background()
 	runtime, err := wasm.NewRuntime(dir)
-	if err != nil {
-		t.Fatalf("not expected error: %v", err)
-	}
+	test.Nil(t, err)
 	defer func() {
 		runtime.Close(ctx)
 	}()
@@ -125,9 +124,7 @@ func Test(t *testing.T) {
 		t.Run(s.name(), func(t *testing.T) {
 			t.Setenv("wasm.timeout", (2 * time.Second).String())
 			m, err := wasm.NewModule(ctx, runtime, s.wasm(), "event", s.logFn())
-			if err != nil {
-				t.Fatalf("not expected error: %v", err)
-			}
+			test.Nil(t, err)
 			t.Cleanup(func() {
 				m.Close(ctx)
 			})
@@ -145,13 +142,10 @@ func TestParalel(t *testing.T) {
 	dir := t.TempDir()
 	ctx := context.Background()
 	runtime, err := wasm.NewRuntime(dir)
-	if err != nil {
-		t.Fatalf("not expected error: %v", err)
-	}
+	test.Nil(t, err)
 	defer func() {
-		if err := runtime.Close(ctx); err != nil {
-			t.Errorf("not expecting error: %v", err)
-		}
+		err := runtime.Close(ctx)
+		test.Nil(t, err)
 	}()
 
 	wgready := sync.WaitGroup{}
@@ -204,14 +198,10 @@ func TestParalel(t *testing.T) {
 				_, ok := os.LookupEnv("wasm.timeout")
 				print(ok)
 				m, err := wasm.NewModule(ctx, runtime, s.wasm(), "event", s.logFn())
-				if err != nil {
-					t.Errorf("not expected error: %v", err)
-					return
-				}
+				test.Nil(t, err)
 				t.Cleanup(func() {
-					if err := m.Close(ctx); err != nil {
-						t.Errorf("not expecting error %v", err)
-					}
+					err := m.Close(ctx)
+					test.Nil(t, err)
 				})
 				id, msg := s.input()
 				wgready.Done()
@@ -278,15 +268,11 @@ func (s *scenariolog) validateError(t *testing.T, err error) {
 }
 
 func (*scenariowitherror) validateError(t *testing.T, err error) {
-	if err == nil {
-		t.Error("expected error got <nil>")
-	}
+	test.NotNil(t, err)
 }
 
 func (*scenarioresult) validateError(t *testing.T, err error) {
-	if err != nil {
-		t.Fatalf("not expected error: %v", err)
-	}
+	test.Nil(t, err)
 }
 
 func (i *inputdata) input() (uint32, string) {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/andrescosta/goico/pkg/env"
+	"github.com/andrescosta/goico/pkg/option"
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/grpc/svcmeta"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
@@ -26,18 +27,23 @@ type (
 	HealthCheckFn func(context.Context) error
 )
 
-type grpcOptions struct {
+type Option interface {
+	Apply(*Options)
+}
+type Options struct {
 	addr        *string
 	ctx         context.Context
 	name        string
 	newService  NewServiceFn
 	serviceDesc *grpc.ServiceDesc
 	healthCheck HealthCheckFn
+	listener    service.GrpcListener
 }
 
 type Service struct {
 	base        *service.Base
 	grpcServer  *grpc.Server
+	listener    service.GrpcListener
 	closeableFn Closeable
 }
 
@@ -45,13 +51,13 @@ type Closeable interface {
 	Close() error
 }
 
-func New(opts ...func(*grpcOptions)) (*Service, error) {
-	opt := &grpcOptions{
+func New(opts ...Option) (*Service, error) {
+	opt := &Options{
 		ctx: context.Background(),
 	}
 
 	for _, o := range opts {
-		o(opt)
+		o.Apply(opt)
 	}
 
 	svc := &Service{}
@@ -65,6 +71,8 @@ func New(opts ...func(*grpcOptions)) (*Service, error) {
 		return nil, err
 	}
 	svc.base = sb
+
+	svc.listener = opt.listener
 
 	var sopts []grpc.ServerOption
 	sopts = append(sopts, svc.base.OtelProvider.InstrumentGrpcServer())
@@ -101,9 +109,9 @@ func New(opts ...func(*grpcOptions)) (*Service, error) {
 }
 
 func (g *Service) Serve() error {
-	listener, err := net.Listen("tcp", *g.base.Addr)
+	listener, err := g.listener.Listen(*g.base.Addr)
 	if err != nil {
-		return fmt.Errorf("net.listen: failed to create listener on %s: %w", *g.base.Addr, err)
+		return err
 	}
 	return g.DoServe(listener)
 }
@@ -178,38 +186,44 @@ func (g *Service) Addr() *string {
 }
 
 // Setters
-func WithAddr(a *string) func(*grpcOptions) {
-	return func(r *grpcOptions) {
+func WithAddr(a *string) Option {
+	return option.NewFuncOption(func(r *Options) {
 		r.addr = a
-	}
+	})
 }
 
-func WithHealthCheckFn(healthCheck HealthCheckFn) func(*grpcOptions) {
-	return func(r *grpcOptions) {
+func WithHealthCheckFn(healthCheck HealthCheckFn) Option {
+	return option.NewFuncOption(func(r *Options) {
 		r.healthCheck = healthCheck
-	}
+	})
 }
 
-func WithName(n string) func(*grpcOptions) {
-	return func(r *grpcOptions) {
+func WithName(n string) Option {
+	return option.NewFuncOption(func(r *Options) {
 		r.name = n
-	}
+	})
 }
 
-func WithContext(ctx context.Context) func(*grpcOptions) {
-	return func(r *grpcOptions) {
+func WithContext(ctx context.Context) Option {
+	return option.NewFuncOption(func(r *Options) {
 		r.ctx = ctx
-	}
+	})
 }
 
-func WithNewServiceFn(newService NewServiceFn) func(*grpcOptions) {
-	return func(r *grpcOptions) {
+func WithNewServiceFn(newService NewServiceFn) Option {
+	return option.NewFuncOption(func(r *Options) {
 		r.newService = newService
-	}
+	})
 }
 
-func WithServiceDesc(serviceDesc *grpc.ServiceDesc) func(*grpcOptions) {
-	return func(r *grpcOptions) {
+func WithServiceDesc(serviceDesc *grpc.ServiceDesc) Option {
+	return option.NewFuncOption(func(r *Options) {
 		r.serviceDesc = serviceDesc
-	}
+	})
+}
+
+func WithListener(l service.GrpcListener) Option {
+	return option.NewFuncOption(func(r *Options) {
+		r.listener = l
+	})
 }

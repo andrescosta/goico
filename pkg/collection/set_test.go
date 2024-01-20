@@ -7,18 +7,17 @@ import (
 
 	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/collection"
+	"github.com/andrescosta/goico/pkg/test"
 )
 
 func TestSetString(t *testing.T) {
-	test(t, []string{"val1", "val2", "val3"})
-	test(t, []int{88, 77, 66, 55, 90})
+	checkVals(t, []string{"val1", "val2", "val3"})
+	checkVals(t, []int{88, 77, 66, 55, 90})
 }
 
 func TestZero(t *testing.T) {
 	set1 := NewSet[string]()
-	if set1.Size() != 0 {
-		t.Errorf("expected 0 got %d", set1.Size())
-	}
+	test.Equals(t, set1.Size(), 0)
 }
 
 func TestFunc(t *testing.T) {
@@ -32,18 +31,14 @@ func TestFunc(t *testing.T) {
 		{3, "val3"},
 	}
 	set1 := NewSetFn(values, func(v data) int { return v.index })
-	if set1.Size() != 3 {
-		t.Errorf("expecting 3 got %d", set1.Size())
-	}
+	test.Equals(t, set1.Size(), 3)
 	for _, s := range values {
 		if !set1.Has(s.index) {
 			t.Errorf("%v not found", s.index)
 		}
 	}
 	set2 := NewSetFn(values, func(v data) string { return v.name })
-	if set2.Size() != 3 {
-		t.Errorf("expecting 3 got %d", set1.Size())
-	}
+	test.Equals(t, set2.Size(), 3)
 	for _, s := range values {
 		if !set2.Has(s.name) {
 			t.Errorf("%v not found", s.name)
@@ -82,16 +77,14 @@ func TestDuplicated(t *testing.T) {
 	}
 }
 
-func test[T cmp.Ordered](t *testing.T, values []T) {
+func checkVals[T cmp.Ordered](t *testing.T, values []T) {
 	set1 := NewSet(values...)
 	for _, s := range values {
 		if !set1.Has(s) {
 			t.Errorf("%v not found", s)
 		}
 	}
-	if set1.Size() != len(values) {
-		t.Errorf("expected %d as size got %d", len(values), set1.Size())
-	}
+	test.Equals(t, set1.Size(), len(values))
 	set1.Delete(values[0])
 	if set1.Has(values[0]) {
 		t.Errorf("found %v", values[0])

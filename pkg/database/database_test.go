@@ -15,6 +15,7 @@ import (
 
 	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/database"
+	"github.com/andrescosta/goico/pkg/test"
 )
 
 type addresses []address
@@ -79,10 +80,8 @@ var (
 
 func TestPathError(t *testing.T) {
 	t.Parallel()
-	_, err := Open("", &Options{})
-	if err == nil {
-		t.Fatalf("Expected error got <nil>")
-	}
+	_, err := Open("", Option{})
+	test.NotNil(t, err)
 }
 
 func TestOperations(t *testing.T) {
@@ -96,16 +95,13 @@ func TestOperations(t *testing.T) {
 		newscenario("getall_and_delete", fillrandomdata, fillrandomdata, add, deleteone, all),
 		newscenario("getall_and_update", fillrandomdata, fillrandomdata, add, update, all),
 	}
-	ops := []*Options{{}, {InMemory: true}}
+	ops := []Option{{}, {InMemory: true}}
 	for _, o := range ops {
 		db, err := Open(filepath.Join(t.TempDir(), "database"), o)
-		if err != nil {
-			t.Fatalf("Database.Open: %s", err)
-		}
+		test.Nil(t, err)
 		defer func() {
-			if err := db.Close(); err != nil {
-				t.Errorf("Database.Close: %s", err)
-			}
+			err := db.Close()
+			test.Nil(t, err)
 		}()
 
 		for _, s := range scenarios {
@@ -127,14 +123,11 @@ func TestMarshallerError(t *testing.T) {
 	scenariosData := newscenario("data", fillrandomdata, add)
 
 	dbName := filepath.Join(t.TempDir(), "database-m-error.md")
-	db, err := Open(dbName, nil)
-	if err != nil {
-		t.Fatalf("Database.Open: %s", err)
-	}
+	db, err := Open(dbName, Option{})
+	test.Nil(t, err)
 	defer func() {
-		if err := db.Close(); err != nil {
-			t.Errorf("Database.Close: %s", err)
-		}
+		err := db.Close()
+		test.Nil(t, err)
 	}()
 
 	scenariosData.execute(t, db)
@@ -166,10 +159,8 @@ func (s *scenario) execute(t *testing.T, db *Database) {
 	table := NewTable(db, tableName, tenant, marshaller)
 	s.table = table
 	for _, step := range s.steps {
-		if err := step.execute(s); err != nil {
-			t.Error(err)
-			return
-		}
+		err := step.execute(s)
+		test.Nil(t, err)
 	}
 }
 

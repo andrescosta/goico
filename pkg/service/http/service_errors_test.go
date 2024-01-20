@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/andrescosta/goico/pkg/service"
 	"github.com/gorilla/mux"
+
 	//revive:disable-next-line:dot-imports
 	. "github.com/andrescosta/goico/pkg/service/http"
 )
@@ -16,6 +18,7 @@ func TestListenNoError(t *testing.T) {
 	localhost := "127.0.0.1:0"
 	ctx, cancel := context.WithCancel(context.Background())
 	svc, err := New(
+		WithListener[*ServiceOptions](service.DefaultHTTPListener),
 		WithContext(ctx),
 		WithAddr(&localhost),
 		WithName("listener-test"),
