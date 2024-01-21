@@ -44,3 +44,9 @@ func (s *SyncQueue[T]) Size() int {
 	defer s.mutex.Unlock()
 	return len(s.data)
 }
+
+func (s *SyncQueue[T]) Clear() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.data = make([]T, 0)
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os/signal"
 	"syscall"
@@ -28,6 +29,7 @@ type Base struct {
 	OtelProvider *obs.OtelProvider
 	Ctx          context.Context
 	done         context.CancelFunc
+	logWriter    io.WriteCloser
 }
 
 var (
@@ -50,15 +52,16 @@ func New(opts ...Option) (*Base, error) {
 	}
 
 	// .env files loading
-	if _, err := env.Load(svc.meta.Name); err != nil {
+	if _, _, err := env.Load(svc.meta.Name); err != nil {
 		return nil, err
 	}
 	// OS signal handling
 	svc.Ctx, svc.done = signal.NotifyContext(svc.Ctx, syscall.SIGINT, syscall.SIGTERM)
 
 	// log initialization
-	logger := log.NewWithContext(map[string]string{"service": svc.meta.Name})
+	logger, logWriter := log.NewWithContext(map[string]string{"service": svc.meta.Name})
 	svc.Ctx = logger.WithContext(svc.Ctx)
+	svc.logWriter = logWriter
 
 	if svc.Addr == nil {
 		addrEnv := svc.meta.Name + ".addr"
@@ -123,6 +126,11 @@ func (s *Base) waitForDoneAndEndTheWorld() {
 		logger.Warn().Errs(zerolog.ErrorFieldName, e).Msg("OtelProvider.Shutdown: error stopping providers")
 	} else {
 		logger.Debug().Msg("Service: stopped without errors")
+	}
+	if s.logWriter != nil {
+		if err := s.logWriter.Close(); err != nil {
+			println(err)
+		}
 	}
 }
 

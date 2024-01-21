@@ -218,17 +218,17 @@ func TestStoppedError(t *testing.T) {
 	err = b.Stop()
 	test.Nil(t, err)
 	err = b.Stop()
-	test.ErrorNotIs(t, err, ErrStopped)
+	test.ErrorIs(t, err, ErrStopped)
 	err = b.Write(newdata)
-	test.ErrorNotIs(t, err, ErrStopped)
+	test.ErrorIs(t, err, ErrStopped)
 	err = b.WriteSync(newdata)
-	test.ErrorNotIs(t, err, ErrStopped)
+	test.ErrorIs(t, err, ErrStopped)
 	err = b.Unsubscribe(l)
-	test.ErrorNotIs(t, err, ErrStopped)
+	test.ErrorIs(t, err, ErrStopped)
 	_, err = b.Subscribe()
-	test.ErrorNotIs(t, err, ErrStopped)
+	test.ErrorIs(t, err, ErrStopped)
 	_, err = b.IsSubscribed(l)
-	test.ErrorNotIs(t, err, ErrStopped)
+	test.ErrorIs(t, err, ErrStopped)
 }
 
 func TestUnsubscribeUnsubscribe(t *testing.T) {

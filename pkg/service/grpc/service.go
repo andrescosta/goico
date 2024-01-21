@@ -185,6 +185,11 @@ func (g *Service) Addr() *string {
 	return g.base.Addr
 }
 
+func (g *Service) Conn(d service.GrpcDialer) (*grpc.ClientConn, error) {
+	addr := g.Addr()
+	return d.Dial(g.base.Ctx, *addr)
+}
+
 // Setters
 func WithAddr(a *string) Option {
 	return option.NewFuncOption(func(r *Options) {

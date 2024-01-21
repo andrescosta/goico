@@ -31,8 +31,8 @@ type (
 	HTTPListener interface {
 		Listen(addr string) (net.Listener, error)
 	}
-	TranportSetter interface {
-		Set(addr string) error
+	HTTPTranporter interface {
+		Tranport(addr string) (*http.Transport, error)
 	}
 )
 
@@ -70,7 +70,7 @@ func (t *BufConn) Dial(_ context.Context, addr string) (*rpc.ClientConn, error) 
 		return nil, ErrEmptyAddress
 	}
 	l := t.listenerFor(addr)
-	o := rpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) { return l.Dial() })
+	o := rpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) { return l.DialContext(ctx) })
 	c, err := rpc.Dial(addr, rpc.WithTransportCredentials(insecure.NewCredentials()), o)
 	if err != nil {
 		return nil, err
@@ -85,17 +85,16 @@ func (t *BufConn) Listen(addr string) (net.Listener, error) {
 	return t.listenerFor(addr), nil
 }
 
-func (t *BufConn) Set(addr string) error {
+func (t *BufConn) Tranport(addr string) (*http.Transport, error) {
 	if addr == "" {
-		return ErrEmptyAddress
+		return nil, ErrEmptyAddress
 	}
 	l := t.listenerFor(addr)
-	http.DefaultTransport = &http.Transport{
+	return &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return l.DialContext(context.Background())
 		},
-	}
-	return nil
+	}, nil
 }
 
 func (t *BufConn) listenerFor(addr string) *bufconn.Listener {

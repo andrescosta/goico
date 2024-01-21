@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option go_package = "/event";
+
+message Empty {
+}
+
+message  Event{
+    enum EventType {
+        Add = 0;
+        Update = 1;
+        Delete = 2;
+        Error = 3;
+    }
+    string name = 1;
+    EventType type = 2;
+}
+  
+
+service CacheService {
+    rpc Events(Empty) returns (stream Event);
+}

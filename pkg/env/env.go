@@ -22,10 +22,7 @@ const (
 	fileDefault   = ".env"
 )
 
-var (
-	environment  = Development
-	environments = []string{Development, Production, Test}
-)
+var environments = []string{Development, Production, Test}
 
 func String(key string, defs ...string) string {
 	s, ok := os.LookupEnv(key)
@@ -93,19 +90,19 @@ func Array(key string, def string) []string {
 // Follows this convention:
 //
 //	https://github.com/bkeepers/dotenv#what-other-env-files-can-i-use
-func Load(name string) (bool, error) {
+func Load(name string) (bool, string, error) {
 	loaded := false
 
 	// "basedir" set
 	if err := setEnvsUsingCommandLineArgs(); err != nil {
-		return false, err
+		return false, "", err
 	}
-	environment = os.Getenv(EnviromentVar)
+	environment := os.Getenv(EnviromentVar)
 	if strings.TrimSpace(environment) == "" {
 		environment = Development
 	} else {
 		if !slices.Contains(environments, environment) {
-			return false, fmt.Errorf("invalid environment %s", environment)
+			return false, "", fmt.Errorf("invalid environment %s", environment)
 		}
 	}
 	if err := load(true, ".env."+environment+".local"); err == nil {
@@ -130,7 +127,7 @@ func Load(name string) (bool, error) {
 		loaded = true
 	}
 
-	return loaded, nil
+	return loaded, environment, nil
 }
 
 func Workdir() string {

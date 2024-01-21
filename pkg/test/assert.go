@@ -7,9 +7,10 @@ import (
 )
 
 func Nil(t *testing.T, o interface{}, msg ...string) {
+	t.Helper()
 	if o != nil {
 		if len(msg) > 0 {
-			t.Error(msg[0])
+			t.Errorf(msg[0])
 		} else {
 			t.Errorf("expected <nil> got %#v", o)
 		}
@@ -18,20 +19,31 @@ func Nil(t *testing.T, o interface{}, msg ...string) {
 }
 
 func NotNil(t *testing.T, o interface{}) {
+	t.Helper()
 	if o == nil {
-		t.Error("not expected <nil>")
+		t.Errorf("not expected <nil>")
 		t.FailNow()
 	}
 }
 
-func ErrorNotIs(t *testing.T, err error, errNotIs error) {
-	if !errors.Is(err, errNotIs) {
-		t.Errorf("Error not expected:%s", err)
+func ErrorIs(t *testing.T, err error, target error) {
+	t.Helper()
+	if !errors.Is(err, target) {
+		t.Errorf("expected %v got %v", target, err)
+		t.FailNow()
+	}
+}
+
+func ErrorNotIs(t *testing.T, err error, target error) {
+	t.Helper()
+	if errors.Is(err, target) {
+		t.Errorf("Expected error: %v,got %v", target, err)
 		t.FailNow()
 	}
 }
 
 func NotEmpty(t *testing.T, o interface{}) {
+	t.Helper()
 	obj := reflect.ValueOf(o)
 	//exhaustive:ignore only for Slice, Map and Chan
 	switch obj.Kind() {
@@ -47,6 +59,7 @@ func NotEmpty(t *testing.T, o interface{}) {
 }
 
 func Empty(t *testing.T, o interface{}) {
+	t.Helper()
 	obj := reflect.ValueOf(o)
 	//exhaustive:ignore only for Slice, Map and Chan
 	switch obj.Kind() {
@@ -62,6 +75,7 @@ func Empty(t *testing.T, o interface{}) {
 }
 
 func Equals(t *testing.T, i int, l int) {
+	t.Helper()
 	if i != l {
 		t.Errorf("expected %d got %d", i, l)
 		t.FailNow()
@@ -69,6 +83,7 @@ func Equals(t *testing.T, i int, l int) {
 }
 
 func NotIsLen(t *testing.T, o interface{}, l int) {
+	t.Helper()
 	NotNil(t, o)
 	obj := reflect.ValueOf(o)
 	//exhaustive:ignore only for Slice, Map and Chan

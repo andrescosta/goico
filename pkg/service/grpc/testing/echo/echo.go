@@ -15,7 +15,6 @@ import (
 type Service struct {
 	listener *bufconn.Listener
 	service  *grpc.Service
-	// broadcasterEcho *broadcaster.Broadcaster[*EchoResponse]
 }
 
 type Server struct {
