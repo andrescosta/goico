@@ -15,28 +15,28 @@ type Starter interface {
 type serviceCtx struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-	C      chan struct{}
+	stopCh chan struct{}
 }
 
 type ServiceGroup struct {
-	w     *sync.WaitGroup
-	ctxs  map[Starter]serviceCtx
-	qerrs *collection.SyncQueue[error]
+	w       *sync.WaitGroup
+	ctxs    map[Starter]serviceCtx
+	qerrors *collection.SyncQueue[error]
 }
 
 func NewServiceGroup() *ServiceGroup {
 	return &ServiceGroup{
-		w:     &sync.WaitGroup{},
-		ctxs:  make(map[Starter]serviceCtx),
-		qerrs: collection.NewQueue[error](),
+		w:       &sync.WaitGroup{},
+		ctxs:    make(map[Starter]serviceCtx),
+		qerrors: collection.NewQueue[error](),
 	}
 }
 
-func (s *ServiceGroup) AddAndStart(services []Starter) {
-	s.AddAndStartWithContext(context.Background(), services)
+func (s *ServiceGroup) Start(services []Starter) {
+	s.StartWithContext(context.Background(), services)
 }
 
-func (s *ServiceGroup) AddAndStartWithContext(ctx context.Context, services []Starter) {
+func (s *ServiceGroup) StartWithContext(ctx context.Context, services []Starter) {
 	s.w.Add(len(services))
 	for _, service := range services {
 		ctx, cancel := context.WithCancel(ctx)
@@ -46,22 +46,22 @@ func (s *ServiceGroup) AddAndStartWithContext(ctx context.Context, services []St
 			defer s.w.Done()
 			defer close(ch)
 			if err := service.Start(ctx); err != nil {
-				s.qerrs.Queue(err)
+				s.qerrors.Queue(err)
 			}
 		}(service)
 	}
 }
 
 func (s *ServiceGroup) Errors() error {
-	if s.qerrs.Size() > 0 {
-		return errors.Join(s.qerrs.Slice()...)
+	if s.qerrors.Size() > 0 {
+		return errors.Join(s.qerrors.Slice()...)
 	}
 	return nil
 }
 
 func (s *ServiceGroup) ResetErrors() error {
 	e := s.Errors()
-	s.qerrs.Clear()
+	s.qerrors.Clear()
 	return e
 }
 
@@ -70,8 +70,8 @@ func (s *ServiceGroup) Stop() error {
 		v.cancel()
 	}
 	s.w.Wait()
-	if s.qerrs.Size() > 0 {
-		return errors.Join(s.qerrs.Slice()...)
+	if s.qerrors.Size() > 0 {
+		return errors.Join(s.qerrors.Slice()...)
 	}
 	return nil
 }
@@ -83,8 +83,8 @@ func (s *ServiceGroup) StopService(st Starter) (<-chan struct{}, error) {
 	}
 	c.cancel()
 	delete(s.ctxs, st)
-	if s.qerrs.Size() > 0 {
-		return c.C, errors.Join(s.qerrs.Slice()...)
+	if s.qerrors.Size() > 0 {
+		return c.stopCh, errors.Join(s.qerrors.Slice()...)
 	}
-	return c.C, nil
+	return c.stopCh, nil
 }
