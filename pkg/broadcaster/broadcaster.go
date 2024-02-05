@@ -132,7 +132,7 @@ func (b *Broadcaster[T]) Write(t T) error {
 	}
 	go func() {
 		defer b.statusBarrier.Out()
-		ti := time.NewTimer(1 * time.Second)
+		ti := time.NewTimer(10 * time.Second)
 		select {
 		case b.c <- t:
 		case <-ti.C:
@@ -147,7 +147,7 @@ func (b *Broadcaster[T]) WriteSync(t T) error {
 	if b.statusBarrier.IsStopped() {
 		return ErrStopped
 	}
-	ti := time.NewTimer(1 * time.Second)
+	ti := time.NewTimer(10 * time.Second)
 	select {
 	case b.c <- t:
 	case <-ti.C:

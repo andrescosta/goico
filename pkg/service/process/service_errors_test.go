@@ -16,10 +16,9 @@ func TestErrorProcess(t *testing.T) {
 		process.WithContext(context.Background()),
 		process.WithSidecarListener(service.DefaultHTTPListener),
 		process.WithName("executor"),
-		process.WithAddr(&localhost),
-		process.WithEnableSidecar(true),
+		process.WithAddr(localhost),
 		process.WithHealthCheckFN(getHealthCheckHandlerR()),
-		process.WithServeHandler(func(ctx context.Context) error {
+		process.WithStarter(func(ctx context.Context) error {
 			return errors.New("process error")
 		}),
 	)

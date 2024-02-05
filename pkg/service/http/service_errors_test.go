@@ -20,7 +20,7 @@ func TestListenNoError(t *testing.T) {
 	svc, err := New(
 		WithListener[*ServiceOptions](service.DefaultHTTPListener),
 		WithContext(ctx),
-		WithAddr(&localhost),
+		WithAddr(localhost),
 		WithName("listener-test"),
 	)
 	if err != nil {
@@ -41,7 +41,7 @@ func TestInitRouteErrors(t *testing.T) {
 	localhost := "127.0.0.1:0"
 	_, err := New(
 		WithContext(context.Background()),
-		WithAddr(&localhost),
+		WithAddr(localhost),
 		WithName("listener-test"),
 		WithInitRoutesFn(func(ctx context.Context, r *mux.Router) error {
 			return errors.New("errror")
@@ -56,7 +56,7 @@ func TestSamePort(t *testing.T) {
 	localhost := "127.0.0.1:0"
 	svc1, err := New(
 		WithContext(context.Background()),
-		WithAddr(&localhost),
+		WithAddr(localhost),
 		WithName("listener-test"),
 		WithInitRoutesFn(func(ctx context.Context, r *mux.Router) error {
 			r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {}).Schemes("http")
@@ -80,7 +80,7 @@ func TestSamePort(t *testing.T) {
 	}()
 	svc2, err := New(
 		WithContext(context.Background()),
-		WithAddr(&addr),
+		WithAddr(addr),
 		WithName("listener-test"),
 		WithInitRoutesFn(func(ctx context.Context, r *mux.Router) error {
 			r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {}).Schemes("http")

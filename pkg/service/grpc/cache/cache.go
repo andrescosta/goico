@@ -23,6 +23,10 @@ func New[K comparable, V any](ctx context.Context, name string) *Cache[K, V] {
 	}
 }
 
+func (c *Cache[K, V]) Close() error {
+	return c.listeners.Stop()
+}
+
 func (c *Cache[K, V]) Name() string {
 	return c.name
 }

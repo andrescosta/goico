@@ -27,11 +27,13 @@ type (
 	HealthCheckFn func(context.Context) error
 )
 
+const Kind = service.GRPC
+
 type Option interface {
 	Apply(*Options)
 }
 type Options struct {
-	addr        *string
+	addr        string
 	ctx         context.Context
 	name        string
 	newService  NewServiceFn
@@ -41,10 +43,12 @@ type Options struct {
 }
 
 type Service struct {
-	base        *service.Base
-	grpcServer  *grpc.Server
-	listener    service.GrpcListener
-	closeableFn Closeable
+	base           *service.Base
+	grpcServer     *grpc.Server
+	listener       service.GrpcListener
+	healthCheck    HealthCheckFn
+	healthCheckSrv *health.Server
+	closeableFn    Closeable
 }
 
 type Closeable interface {
@@ -95,21 +99,22 @@ func New(opts ...Option) (*Service, error) {
 	}
 	server.RegisterService(opt.serviceDesc, grpcsvc)
 	reflection.Register(server)
-	healthcheck := health.NewServer()
-	healthpb.RegisterHealthServer(server, healthcheck)
 	if env.Bool("metadata.enabled", false) {
 		svcmeta.RegisterGrpcMetadataServer(server, svcmeta.NewServerInfo(svc.Metadata()))
 	}
 	svc.grpcServer = server
-	healthcheck.SetServingStatus(svc.base.Name(), healthpb.HealthCheckResponse_SERVING)
 	if opt.healthCheck != nil {
-		go healthcheckIt(svc.base.Ctx, svc.base.Name(), healthcheck, opt.healthCheck)
+		healthCheckSrv := health.NewServer()
+		healthpb.RegisterHealthServer(server, healthCheckSrv)
+		healthCheckSrv.SetServingStatus(svc.base.Name(), healthpb.HealthCheckResponse_NOT_SERVING)
+		svc.healthCheck = opt.healthCheck
+		svc.healthCheckSrv = healthCheckSrv
 	}
 	return svc, nil
 }
 
 func (g *Service) Serve() error {
-	listener, err := g.listener.Listen(*g.base.Addr)
+	listener, err := g.listener.Listen(g.base.Addr)
 	if err != nil {
 		return err
 	}
@@ -119,20 +124,29 @@ func (g *Service) Serve() error {
 func (g *Service) DoServe(listener net.Listener) error {
 	logger := zerolog.Ctx(g.base.Ctx)
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
-	if g.base.Addr == nil {
+	if g.base.Addr == "" {
 		return errors.New("GrpcService.serve: the listening address was not configured")
 	}
 
 	go func() {
 		<-g.base.Ctx.Done()
 		logger.Debug().Msg("GRPC Server: shutting down")
+		if g.healthCheckSrv != nil {
+			g.healthCheckSrv.Shutdown()
+		}
 		g.grpcServer.GracefulStop()
 	}()
-	logger.Debug().Msgf("GRPC Server: started on %s", *g.base.Addr)
+	logger.Debug().Msgf("GRPC Server: started on %s", g.base.Addr)
 	g.base.Started()
+
+	if g.healthCheck != nil {
+		go g.healthcheckIt(g.base.Ctx)
+	}
+
 	if err := g.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
+
 	logger.Debug().Msg("GRPC Server: stopped")
 	logger.Info().Msgf("Process %d ended ", os.Getpid())
 	return nil
@@ -152,46 +166,59 @@ func (g *Service) Metadata() map[string]string {
 	return g.base.Metadata()
 }
 
-func healthcheckIt(ctx context.Context, name string, healthcheck *health.Server, healthCheckHandler func(context.Context) error) {
-	current := healthpb.HealthCheckResponse_SERVING
+func (g *Service) healthcheckIt(ctx context.Context) {
+	current := g.checkAndSetServingStatus(ctx, healthpb.HealthCheckResponse_UNKNOWN)
 	for {
 		timer := time.NewTicker(*env.Duration("grpc.healthcheck", 5*time.Second))
 		defer timer.Stop()
 		select {
 		case <-ctx.Done():
-			healthcheck.Shutdown()
+			g.healthCheckSrv.Shutdown()
 			return
 		case <-timer.C:
-			if err := healthCheckHandler(ctx); err != nil {
-				if current == healthpb.HealthCheckResponse_SERVING {
-					healthcheck.SetServingStatus(name, healthpb.HealthCheckResponse_NOT_SERVING)
-					current = healthpb.HealthCheckResponse_NOT_SERVING
-				}
-			} else {
-				if current == healthpb.HealthCheckResponse_NOT_SERVING {
-					healthcheck.SetServingStatus(name, healthpb.HealthCheckResponse_SERVING)
-					current = healthpb.HealthCheckResponse_SERVING
-				}
-			}
+			current = g.checkAndSetServingStatus(ctx, current)
 		}
 	}
+}
+
+func (g *Service) checkAndSetServingStatus(ctx context.Context, current healthpb.HealthCheckResponse_ServingStatus) healthpb.HealthCheckResponse_ServingStatus {
+	if err := g.healthCheck(ctx); err != nil {
+		if current == healthpb.HealthCheckResponse_SERVING || current == healthpb.HealthCheckResponse_UNKNOWN {
+			g.healthCheckSrv.SetServingStatus(g.base.Name(), healthpb.HealthCheckResponse_NOT_SERVING)
+			return healthpb.HealthCheckResponse_NOT_SERVING
+		}
+	} else {
+		if current == healthpb.HealthCheckResponse_NOT_SERVING || current == healthpb.HealthCheckResponse_UNKNOWN {
+			g.healthCheckSrv.SetServingStatus(g.base.Name(), healthpb.HealthCheckResponse_SERVING)
+			return healthpb.HealthCheckResponse_SERVING
+		}
+	}
+	return current
 }
 
 func (g *Service) Name() string {
 	return g.base.Name()
 }
 
-func (g *Service) Addr() *string {
+func (g *Service) Addr() string {
 	return g.base.Addr
 }
 
-func (g *Service) Conn(d service.GrpcDialer) (*grpc.ClientConn, error) {
+func (g *Service) Dial(d service.GrpcDialer) (*grpc.ClientConn, error) {
 	addr := g.Addr()
-	return d.Dial(g.base.Ctx, *addr)
+	return d.Dial(g.base.Ctx, addr)
+}
+
+func (g *Service) HelthCheckClient(d service.GrpcDialer) (*HealthCheckClient, error) {
+	conn, err := g.Dial(d)
+	if err != nil {
+		return nil, err
+	}
+	return NewHelthCheckClientWithConn(conn, g.Name())
 }
 
 // Setters
-func WithAddr(a *string) Option {
+func WithAddr(a string) Option {
 	return option.NewFuncOption(func(r *Options) {
 		r.addr = a
 	})

@@ -31,7 +31,7 @@ func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthC
 	localhost := "127.0.0.1:0"
 	svc, err := httpsvc.New(
 		httpsvc.WithContext(ctx),
-		httpsvc.WithAddr(&localhost),
+		httpsvc.WithAddr(localhost),
 		httpsvc.WithName("listener-test"),
 		httpsvc.WithStackLevelOnError[*httpsvc.ServiceOptions](stackLevel),
 		httpsvc.WithHealthCheck[*httpsvc.ServiceOptions](hfn),
@@ -70,7 +70,7 @@ func NewSidecar(ctx context.Context, hfn httpsvc.HealthCheckFn) (*Service, error
 		service.WithName("sidecar-test"),
 		service.WithContext(ctx),
 		service.WithKind("headless"),
-		service.WithAddr(&localhost),
+		service.WithAddr(localhost),
 	)
 	if err != nil {
 		return nil, err

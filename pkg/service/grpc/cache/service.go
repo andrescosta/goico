@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 
+	"github.com/andrescosta/goico/pkg/broadcaster"
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/grpc"
 	"github.com/andrescosta/goico/pkg/service/grpc/cache/event"
+	"github.com/andrescosta/jobico/pkg/grpchelper"
+	rpc "google.golang.org/grpc"
 )
 
 type server[K comparable, V any] struct {
@@ -38,14 +41,33 @@ func (s *server[K, V]) Events(_ *event.Empty, in event.CacheService_EventsServer
 	}
 }
 
-type Service struct {
-	service *grpc.Service
-}
+type (
+	Setter  func(*Service)
+	Service struct {
+		grpc.Container
+	}
+)
 
-func NewService[K comparable, V any](ctx context.Context, listener service.GrpcListener, cache *Cache[K, V]) (*Service, error) {
+const name = "cache_listener"
+
+func NewService[K comparable, V any](ctx context.Context, cache *Cache[K, V], ops ...Setter) (*Service, error) {
+	s := &Service{
+		Container: grpc.Container{
+			Name: name,
+			GrpcConn: service.GrpcConn{
+				Dialer:   service.DefaultGrpcDialer,
+				Listener: service.DefaultGrpcListener,
+			},
+		},
+	}
+	for _, op := range ops {
+		op(s)
+	}
+
 	svc, err := grpc.New(
 		grpc.WithName("cache_"+cache.Name()),
-		grpc.WithListener(listener),
+		grpc.WithListener(s.Listener),
+		grpc.WithAddr(s.AddrOrPanic()),
 		grpc.WithContext(ctx),
 		grpc.WithServiceDesc(&event.CacheService_ServiceDesc),
 		grpc.WithNewServiceFn(func(ctx context.Context) (any, error) {
@@ -57,20 +79,70 @@ func NewService[K comparable, V any](ctx context.Context, listener service.GrpcL
 	if err != nil {
 		return nil, err
 	}
-	return &Service{
-		service: svc,
-	}, nil
+	s.Svc = svc
+	return s, nil
 }
 
-func (s *Service) Serve() error {
-	return s.service.Serve()
+func (s *Service) Serve() (err error) {
+	defer s.Svc.Dispose()
+	return s.Svc.Serve()
 }
 
-func NewCacheServiceClient(ctx context.Context, addr string, d service.GrpcDialer) (event.CacheServiceClient, error) {
+func (s *Service) Dispose() {
+	s.Svc.Dispose()
+}
+
+type CacheServiceClient struct {
+	serverAddr       string
+	conn             *rpc.ClientConn
+	client           event.CacheServiceClient
+	broadcasterEvent *broadcaster.Broadcaster[*event.Event]
+}
+
+func NewCacheServiceClient(ctx context.Context, addr string, d service.GrpcDialer) (*CacheServiceClient, error) {
 	conn, err := d.Dial(ctx, addr)
 	if err != nil {
 		return nil, err
 	}
 	client := event.NewCacheServiceClient(conn)
-	return client, nil
+	return &CacheServiceClient{
+		serverAddr: addr,
+		conn:       conn,
+		client:     client,
+	}, nil
+}
+
+func (c *CacheServiceClient) Close() error {
+	if c.broadcasterEvent != nil {
+		c.broadcasterEvent.Stop()
+	}
+	return c.conn.Close()
+}
+
+func (c *CacheServiceClient) ListenerForEvents(ctx context.Context) (*broadcaster.Listener[*event.Event], error) {
+	if c.broadcasterEvent == nil {
+		if err := c.startListenerForEvents(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return c.broadcasterEvent.Subscribe()
+}
+
+func (c *CacheServiceClient) startListenerForEvents(ctx context.Context) error {
+	cb := broadcaster.Start[*event.Event](ctx)
+	c.broadcasterEvent = cb
+	s, err := c.client.Events(ctx, &event.Empty{})
+	if err != nil {
+		return err
+	}
+	go func() {
+		_ = grpchelper.Listen(ctx, s, cb)
+	}()
+	return nil
+}
+
+func WithGrpcConn(g service.GrpcConn) Setter {
+	return func(s *Service) {
+		s.Container.GrpcConn = g
+	}
 }

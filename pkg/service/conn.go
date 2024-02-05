@@ -6,7 +6,10 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
+	"github.com/andrescosta/goico/pkg/env"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	rpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
@@ -17,6 +20,7 @@ var (
 	DefaultGrpcDialer   = netConn
 	DefaultGrpcListener = netConn
 	DefaultHTTPListener = netConn
+	DefaultHTTPClient   = netConn
 )
 
 var ErrEmptyAddress = errors.New("address is empty")
@@ -34,7 +38,34 @@ type (
 	HTTPTranporter interface {
 		Tranport(addr string) (*http.Transport, error)
 	}
+	HTTPClient interface {
+		NewHTTPClient(addr string) (*http.Client, error)
+	}
 )
+
+type GrpcConn struct {
+	Dialer   GrpcDialer
+	Listener GrpcListener
+}
+
+type HttpConn struct {
+	ClientBuilder HTTPClient
+	Listener      HTTPListener
+}
+
+func (s HttpConn) ClientBuilderOrDefault() HTTPClient {
+	if s.ClientBuilder == nil {
+		return DefaultHTTPClient
+	}
+	return s.ClientBuilder
+}
+
+func (s HttpConn) ListenerOrDefault() HTTPListener {
+	if s.Listener == nil {
+		return DefaultHTTPListener
+	}
+	return s.Listener
+}
 
 type NetConn struct{}
 
@@ -53,13 +84,27 @@ func (NetConn) Listen(addr string) (net.Listener, error) {
 	return net.Listen("tcp", addr)
 }
 
+func (NetConn) NewHTTPClient(addr string) (*http.Client, error) {
+	transport := http.DefaultTransport
+	return &http.Client{
+		Timeout:   1 * time.Second,
+		Transport: transport,
+	}, nil
+}
+
 type BufConn struct {
+	timeout   time.Duration
 	mu        *sync.Mutex
 	listeners map[string]*bufconn.Listener
 }
 
 func NewBufConn() *BufConn {
+	return NewBufConnWithTimeout(*env.Duration("dial.timeout"))
+}
+
+func NewBufConnWithTimeout(timeout time.Duration) *BufConn {
 	return &BufConn{
+		timeout:   timeout,
 		listeners: make(map[string]*bufconn.Listener),
 		mu:        &sync.Mutex{},
 	}
@@ -70,8 +115,11 @@ func (t *BufConn) Dial(_ context.Context, addr string) (*rpc.ClientConn, error) 
 		return nil, ErrEmptyAddress
 	}
 	l := t.listenerFor(addr)
-	o := rpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) { return l.DialContext(ctx) })
-	c, err := rpc.Dial(addr, rpc.WithTransportCredentials(insecure.NewCredentials()), o)
+	ctxDialerOp := rpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) { return l.DialContext(ctx) })
+	timeOutOp := rpc.WithUnaryInterceptor(
+		timeout.UnaryClientInterceptor(t.timeout),
+	)
+	c, err := rpc.Dial(addr, rpc.WithTransportCredentials(insecure.NewCredentials()), ctxDialerOp, timeOutOp)
 	if err != nil {
 		return nil, err
 	}
@@ -106,4 +154,32 @@ func (t *BufConn) listenerFor(addr string) *bufconn.Listener {
 		t.listeners[addr] = l
 	}
 	return l
+}
+
+func (t *BufConn) CloseAll() {
+	for _, v := range t.listeners {
+		_ = v.Close()
+	}
+}
+
+func (t *BufConn) Close(addr string) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	l, ok := t.listeners[addr]
+	if ok {
+		delete(t.listeners, addr)
+		return l.Close()
+	}
+	return nil
+}
+
+func (t *BufConn) NewHTTPClient(addr string) (*http.Client, error) {
+	transport, err := t.Tranport(addr)
+	if err != nil {
+		return nil, err
+	}
+	return &http.Client{
+		Timeout:   t.timeout,
+		Transport: transport,
+	}, nil
 }

@@ -29,7 +29,7 @@ func (s *Service) Name() string {
 	return s.service.Name()
 }
 
-func (s *Service) Addr() *string {
+func (s *Service) Addr() string {
 	return s.service.Addr()
 }
 
@@ -39,7 +39,7 @@ func NewWithServer(ctx context.Context, server EchoServer, h grpc.HealthCheckFn)
 	addr := "0.0.0.0"
 	svc, err := grpc.New(
 		grpc.WithName("echo"),
-		grpc.WithAddr(&addr),
+		grpc.WithAddr(addr),
 		grpc.WithHealthCheckFn(h),
 		grpc.WithContext(ctx),
 		grpc.WithServiceDesc(&Echo_ServiceDesc),
@@ -88,7 +88,7 @@ func (s *Service) Client(ctx context.Context) (EchoClient, error) {
 	return NewEchoClient(conn), nil
 }
 
-func (s *Service) HealthCheckClient(ctx context.Context) (*grpc.HelthCheckClient, error) {
+func (s *Service) HealthCheckClient(ctx context.Context, name string) (*grpc.HealthCheckClient, error) {
 	conn, err := rpc.DialContext(ctx, "",
 		rpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return s.listener.Dial()
@@ -96,7 +96,7 @@ func (s *Service) HealthCheckClient(ctx context.Context) (*grpc.HelthCheckClient
 	if err != nil {
 		return nil, err
 	}
-	return grpc.NewHelthCheckClientWithConn(conn)
+	return grpc.NewHelthCheckClientWithConn(conn, name)
 }
 
 func (s *Service) InfoClient(ctx context.Context) (*svcmeta.InfoClient, error) {

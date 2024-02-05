@@ -12,7 +12,7 @@ func Nil(t *testing.T, o interface{}, msg ...string) {
 		if len(msg) > 0 {
 			t.Errorf(msg[0])
 		} else {
-			t.Errorf("expected <nil> got %#v", o)
+			t.Errorf("expected <nil> got %v", o)
 		}
 		t.FailNow()
 	}
