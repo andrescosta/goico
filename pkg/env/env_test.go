@@ -287,7 +287,7 @@ func TestLoad(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
 			initializeScenario(t, s)
-			loaded, err := env.Load(serviceName)
+			loaded, _, err := env.Load(serviceName)
 			if !loaded && err == nil {
 				t.Error(".env files were not loaded")
 			}
@@ -309,7 +309,7 @@ func TestLoadErrors(t *testing.T) {
 		env.Restore(b)
 	})
 	os.Setenv(env.EnviromentVar, "nope")
-	loaded, err := env.Load(serviceName)
+	loaded, _, err := env.Load(serviceName)
 	if loaded {
 		t.Error("expected not loaded got loaded")
 	}
@@ -359,7 +359,7 @@ func TestDefault(t *testing.T) {
 		t.Run(s.name, func(t *testing.T) {
 			initializeScenario(t, s)
 
-			_, err := env.Load(serviceName)
+			_, _, err := env.Load(serviceName)
 			test.Nil(t, err)
 			v := env.String("myserver1", "localhost:7890")
 			if v != "localhost:7890" {
@@ -411,7 +411,7 @@ func TestInvalid(t *testing.T) {
 				delete(envm, ".env")
 				envm[".env"] = e
 			})
-			loaded, err := env.Load(serviceName)
+			loaded, _, err := env.Load(serviceName)
 			if !loaded && err == nil {
 				t.Errorf("files not loaded")
 			}

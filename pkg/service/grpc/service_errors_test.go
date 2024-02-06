@@ -19,7 +19,7 @@ func TestListenNoError(t *testing.T) {
 	svc, err := New(
 		WithListener(service.DefaultGrpcListener),
 		WithName("echo"),
-		WithAddr(&localhost),
+		WithAddr(localhost),
 		WithContext(ctx),
 		WithServiceDesc(&echo.Echo_ServiceDesc),
 		WithNewServiceFn(func(ctx context.Context) (any, error) {
@@ -49,7 +49,7 @@ func TestWithNewServiceFnError(t *testing.T) {
 	localhost := "127.0.0.1:0"
 	_, err := New(
 		WithName("echo"),
-		WithAddr(&localhost),
+		WithAddr(localhost),
 		WithContext(context.Background()),
 		WithServiceDesc(&echo.Echo_ServiceDesc),
 		WithNewServiceFn(func(ctx context.Context) (any, error) {
@@ -67,7 +67,7 @@ func TestSamePort(t *testing.T) {
 	svc1, err := New(
 		WithName("echo"),
 		WithListener(service.DefaultGrpcListener),
-		WithAddr(&localhost),
+		WithAddr(localhost),
 		WithContext(ctx),
 		WithServiceDesc(&echo.Echo_ServiceDesc),
 		WithNewServiceFn(func(ctx context.Context) (any, error) {
@@ -86,7 +86,7 @@ func TestSamePort(t *testing.T) {
 	time.Sleep(10 * time.Microsecond)
 	svc2, err := New(
 		WithName("echo"),
-		WithAddr(&localhost),
+		WithAddr(localhost),
 		WithListener(service.DefaultGrpcListener),
 		WithContext(ctx),
 		WithServiceDesc(&echo.Echo_ServiceDesc),

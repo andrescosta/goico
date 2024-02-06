@@ -1,6 +1,7 @@
 package collection
 
 import (
+	"reflect"
 	"sync"
 )
 
@@ -31,16 +32,41 @@ func (s *SyncQueue[T]) Dequeue() T {
 	return d
 }
 
-func (s *SyncQueue[T]) Slice() []T {
+func (s *SyncQueue[T]) Peek(n int) []T {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	newq := make([]T, len(s.data))
+	if n == -1 {
+		n = len(s.data)
+	}
+	if n > len(s.data) {
+		n = len(s.data)
+	}
+	newq := make([]T, n)
 	copy(newq, s.data)
 	return newq
+}
+
+func (s *SyncQueue[T]) Slice() []T {
+	return s.Peek(-1)
+}
+
+func (s *SyncQueue[T]) Write(p T) (n int, err error) {
+	s.Queue(p)
+	v := reflect.ValueOf(p)
+	if v.Kind() == reflect.Array {
+		return v.Len(), nil
+	}
+	return 0, nil
 }
 
 func (s *SyncQueue[T]) Size() int {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	return len(s.data)
+}
+
+func (s *SyncQueue[T]) Clear() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.data = make([]T, 0)
 }

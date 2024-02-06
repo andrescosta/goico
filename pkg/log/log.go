@@ -33,25 +33,12 @@ type (
 	}
 )
 
-var writer *lumberjack.Logger
-
-func Close() error {
-	if writer != nil {
-		return writer.Close()
-	}
-	return nil
-}
-
-func Luberjack() *lumberjack.Logger {
-	return writer
-}
-
-func New() *zerolog.Logger {
+func New() (*zerolog.Logger, io.WriteCloser) {
 	var empty map[string]string
 	return NewWithContext(empty)
 }
 
-func NewWithContext(ctxInfo map[string]string) *zerolog.Logger {
+func NewWithContext(ctxInfo map[string]string) (*zerolog.Logger, io.WriteCloser) {
 	cfg := config{
 		console: console{
 			Enabled:          env.Bool("log.console.enabled", true),
@@ -76,14 +63,15 @@ func getFileName() (name string) {
 	return
 }
 
-func newLogger(ctxInfo map[string]string, cfg config) *zerolog.Logger {
+func newLogger(ctxInfo map[string]string, cfg config) (*zerolog.Logger, io.WriteCloser) {
 	var writers []io.Writer
+	var writerCloser io.WriteCloser
 	if cfg.console.Enabled {
 		writers = append(writers, configureLogToConsole(cfg.console))
 	}
 	if cfg.file.Enabled && strings.TrimSpace(cfg.file.Name) != "" {
-		setLogToFile(cfg.file)
-		writers = append(writers, writer)
+		writerCloser = lumberjackLogger(cfg.file)
+		writers = append(writers, writerCloser)
 	}
 	level := cfg.Level
 	if len(writers) == 0 {
@@ -101,7 +89,7 @@ func newLogger(ctxInfo map[string]string, cfg config) *zerolog.Logger {
 		ctx = ctx.Str(k, v)
 	}
 	logger := ctx.Logger()
-	return &logger
+	return &logger, writerCloser
 }
 
 func configureLogToConsole(cfg console) (writerc io.Writer) {
@@ -117,12 +105,8 @@ func configureLogToConsole(cfg console) (writerc io.Writer) {
 	return
 }
 
-func setLogToFile(cfg file) {
-	setLumberjack(cfg)
-}
-
-func setLumberjack(cfg file) {
-	writer = &lumberjack.Logger{
+func lumberjackLogger(cfg file) io.WriteCloser {
+	return &lumberjack.Logger{
 		Filename:   cfg.Name,
 		MaxBackups: cfg.MaxBackups,
 		MaxSize:    cfg.MaxSize,

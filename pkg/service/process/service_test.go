@@ -199,10 +199,9 @@ func run(t *testing.T, ss []scenario) {
 				// process.WithSidecarListener(service.DefaultHttpListener),
 				process.WithContext(ctx),
 				process.WithName("executor"),
-				process.WithAddr(&localhost),
-				process.WithEnableSidecar(true),
+				process.WithAddr(localhost),
 				process.WithHealthCheckFN(getHealthCheckHandler(s)),
-				process.WithServeHandler(func(ctx context.Context) error {
+				process.WithStarter(func(ctx context.Context) error {
 					started <- true
 					<-ctx.Done()
 					started <- false

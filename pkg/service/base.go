@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
+	"io"
 	"net"
 	"os/signal"
 	"syscall"
@@ -17,6 +17,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
+type Kind int
+
+const (
+	GRPC Kind = iota + 1
+	HTTP
+	Process
+)
+
 type Option func(*Base)
 
 type ListenerFn func(ctx context.Context, addr string) (net.Listener, error)
@@ -24,16 +32,12 @@ type ListenerFn func(ctx context.Context, addr string) (net.Listener, error)
 // Base provides common functionality for processes that run in background.
 type Base struct {
 	meta         *meta.Data
-	Addr         *string
+	Addr         string
 	OtelProvider *obs.OtelProvider
 	Ctx          context.Context
 	done         context.CancelFunc
+	logWriter    io.WriteCloser
 }
-
-var (
-	ErrOtelStack  = errors.New("obs.New: error initializing otel stack")
-	ErrEnvLoading = errors.New("env.Populate: error initializing otel stack")
-)
 
 func New(opts ...Option) (*Base, error) {
 	// Instantiate with default values
@@ -50,23 +54,16 @@ func New(opts ...Option) (*Base, error) {
 	}
 
 	// .env files loading
-	if _, err := env.Load(svc.meta.Name); err != nil {
+	if _, _, err := env.Load(svc.meta.Name); err != nil {
 		return nil, err
 	}
 	// OS signal handling
 	svc.Ctx, svc.done = signal.NotifyContext(svc.Ctx, syscall.SIGINT, syscall.SIGTERM)
 
 	// log initialization
-	logger := log.NewWithContext(map[string]string{"service": svc.meta.Name})
+	logger, logWriter := log.NewWithContext(map[string]string{"service": svc.meta.Name})
 	svc.Ctx = logger.WithContext(svc.Ctx)
-
-	if svc.Addr == nil {
-		addrEnv := svc.meta.Name + ".addr"
-		svc.Addr = env.StringOrNil(addrEnv)
-		if svc.Addr == nil {
-			return nil, fmt.Errorf(".addr not configured for %s", svc.meta.Name)
-		}
-	}
+	svc.logWriter = logWriter
 
 	// observability provider controlled by envs obs.*
 	o, err := obs.New(svc.Ctx, *svc.meta)
@@ -99,7 +96,7 @@ func (s *Base) WhenStarted() time.Time {
 func (s *Base) Metadata() map[string]string {
 	m := map[string]string{
 		"Name":      s.meta.Name,
-		"Addr":      *s.Addr,
+		"Addr":      s.Addr,
 		"StartTime": s.WhenStarted().Format(time.UnixDate),
 		"Kind":      s.meta.Kind,
 	}
@@ -124,6 +121,11 @@ func (s *Base) waitForDoneAndEndTheWorld() {
 	} else {
 		logger.Debug().Msg("Service: stopped without errors")
 	}
+	if s.logWriter != nil {
+		if err := s.logWriter.Close(); err != nil {
+			println(err)
+		}
+	}
 }
 
 // Setters
@@ -145,7 +147,7 @@ func WithKind(kind string) Option {
 	}
 }
 
-func WithAddr(addr *string) Option {
+func WithAddr(addr string) Option {
 	return func(s *Base) {
 		s.Addr = addr
 	}

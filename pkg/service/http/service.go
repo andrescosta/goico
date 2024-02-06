@@ -19,13 +19,15 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const Kind = service.HTTP
+
 type Service struct {
 	base            *service.Base
 	server          *http.Server
 	healthCheckFunc HealthCheckFn
 	pool            *sync.Pool
 	imsidecar       bool
-	listener        service.HTTPListener
+	Listener        service.HTTPListener
 }
 
 type healthStatus struct {
@@ -52,7 +54,7 @@ type Option[T httpOptions] interface {
 }
 
 type ServiceOptions struct {
-	addr         *string
+	addr         string
 	common       *commonOptions
 	ctx          context.Context
 	name         string
@@ -76,7 +78,7 @@ func New(opts ...Option[*ServiceOptions]) (*Service, error) {
 		},
 		ctx:          context.Background(),
 		initRoutesFn: func(ctx context.Context, r *mux.Router) error { return nil },
-		addr:         nil,
+		addr:         "",
 		name:         "",
 	}
 
@@ -95,7 +97,7 @@ func New(opts ...Option[*ServiceOptions]) (*Service, error) {
 		return nil, err
 	}
 	svc.base = base
-	svc.listener = opt.common.listener
+	svc.Listener = opt.common.listener
 	// Mux Router initialization
 	router := svc.initializeRouter(opt.common)
 
@@ -119,7 +121,7 @@ func NewSidecar(opts ...Option[*SidecarOptions]) (*Service, error) {
 	}
 	svc.base = opt.base
 	svc.imsidecar = true
-	svc.listener = opt.common.listener
+	svc.Listener = opt.common.listener
 
 	// Mux Router initialization
 	_ = svc.initializeRouter(opt.common)
@@ -127,7 +129,7 @@ func NewSidecar(opts ...Option[*SidecarOptions]) (*Service, error) {
 }
 
 func (s *Service) Serve() error {
-	listener, err := s.listener.Listen(*s.base.Addr)
+	listener, err := s.Listener.Listen(s.base.Addr)
 	if err != nil {
 		return err
 	}
@@ -210,12 +212,19 @@ func (s *Service) initializeRouter(opts *commonOptions) (r *mux.Router) {
 	return
 }
 
+func (s *Service) HelthCheckClient(c service.HTTPClient) *HealthCheckClient {
+	return &HealthCheckClient{
+		ServerAddr: s.base.Addr,
+		Builder:    c,
+	}
+}
+
 func newHTTPServer(r http.Handler) *http.Server {
 	return &http.Server{
-		WriteTimeout: *env.Duration("http.timeout.write", time.Second*5),
-		ReadTimeout:  *env.Duration("http.timeout.read", time.Second*5),
-		IdleTimeout:  *env.Duration("http.timeout.idle", time.Second*5),
-		Handler:      http.TimeoutHandler(r, *env.Duration("http.timeout.handler", time.Second), ""),
+		WriteTimeout: *env.Duration("http.timeout.write", time.Second*20),
+		ReadTimeout:  *env.Duration("http.timeout.read", time.Second*20),
+		IdleTimeout:  *env.Duration("http.timeout.idle", time.Second*20),
+		Handler:      http.TimeoutHandler(r, *env.Duration("http.timeout.handler", 20*time.Second), ""),
 	}
 }
 
@@ -234,7 +243,7 @@ func WithInitRoutesFn(i initRoutesFn) Option[*ServiceOptions] {
 	})
 }
 
-func WithAddr(a *string) Option[*ServiceOptions] {
+func WithAddr(a string) Option[*ServiceOptions] {
 	return option.NewFuncOption(func(s *ServiceOptions) {
 		s.addr = a
 	})

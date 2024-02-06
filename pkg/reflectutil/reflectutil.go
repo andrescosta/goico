@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func FuncName(fn interface{}) string {
+func FuncName(fn any) string {
 	ptr := reflect.ValueOf(fn).Pointer()
 	n := runtime.FuncForPC(ptr).Name()
 	dot := strings.LastIndex(n, ".")

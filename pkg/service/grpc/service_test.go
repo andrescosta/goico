@@ -230,8 +230,8 @@ func (s getMetadata) exec(ctx context.Context, t *testing.T, svc *echo.Service, 
 	if info["Name"] != svc.Name() {
 		t.Errorf("expected %s got %s", svc.Name(), info["Name"])
 	}
-	if svc.Addr() != nil && info["Addr"] != *svc.Addr() {
-		t.Errorf("expected %s got %s", *svc.Addr(), info["Addr"])
+	if svc.Addr() != "" && info["Addr"] != svc.Addr() {
+		t.Errorf("expected %s got %s", svc.Addr(), info["Addr"])
 	}
 	_, ok := info["StartTime"]
 	if !ok {
@@ -289,12 +289,12 @@ func (s healthCheck) exec(ctx context.Context, t *testing.T, svc *echo.Service, 
 		time.Sleep(s.wait)
 	}
 	if !s.nocheck {
-		hc, err := svc.HealthCheckClient(ctx)
+		hc, err := svc.HealthCheckClient(ctx, svc.Name())
 		if err != nil {
 			t.Errorf("not expected error: %v", err)
 			return
 		}
-		h, err := hc.Check(ctx, svc.Name())
+		h, err := hc.Check(ctx)
 		if err != nil {
 			t.Errorf("not expected error: %v", err)
 			return

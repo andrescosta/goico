@@ -117,34 +117,6 @@ func TestLogToFile(t *testing.T) {
 			"file_info_ts_text",
 			"file_info_ts_text",
 		),
-		newFileScenarioWithFn(
-			"file_debug_luberjack",
-			[]string{
-				"log.console.enabled=false",
-				"log.console.exclude.timestamp=true",
-				"log.file.enabled=true",
-				"log.file.max.size=180",
-				"log.file.max.backups=200",
-				"log.file.max.age=300",
-				"log.level=0",
-				"log.file.name=${workdir}/file_debug_luberjack.log",
-			},
-			zerolog.DebugLevel,
-			"file_debug_luberjack_txt",
-			"file_debug_luberjack_txt",
-			func(t *testing.T, l logLine) {
-				lj := Luberjack()
-				if lj.MaxSize != 180 {
-					t.Errorf("expected Luberjack.MaxSize = 180 got %d", lj.MaxSize)
-				}
-				if lj.MaxAge != 300 {
-					t.Errorf("expected Luberjack.MaxAge = 300 got %d", lj.MaxAge)
-				}
-				if lj.MaxBackups != 200 {
-					t.Errorf("expected Luberjack.MaxBackups = 200 got %d", lj.MaxBackups)
-				}
-			},
-		),
 	}
 	execute(t, scenarios, tempDir)
 }
@@ -318,13 +290,16 @@ func execute(t *testing.T, scenarios []scenario, tempDir string) {
 				os.Stdout = w
 			}
 			var logger *zerolog.Logger
+			var wc io.WriteCloser
 			if s.context != nil {
-				logger = NewWithContext(s.context)
+				logger, wc = NewWithContext(s.context)
 			} else {
-				logger = New()
+				logger, wc = New()
+			}
+			if wc != nil {
+				defer func() { _ = wc.Close() }()
 			}
 			logger.WithLevel(s.lvl).Msg(s.text)
-			err = Close()
 			test.Nil(t, err)
 			if s.types == typeConsole {
 				err := w.Close()
@@ -478,16 +453,6 @@ func newConsoleScenarioWithContext(name string,
 	expected string,
 ) scenario {
 	return newScenario(0, name, envs, context, lvl, text, expected, nil, nil)
-}
-
-func newFileScenarioWithFn(name string,
-	envs []string,
-	lvl zerolog.Level,
-	text string,
-	expected string,
-	expectedScenarioJSONFn expectedScenarioJSON,
-) scenario {
-	return newScenario(1, name, envs, nil, lvl, text, expected, nil, expectedScenarioJSONFn)
 }
 
 func newFileScenarioWithFnAndContext(name string,
