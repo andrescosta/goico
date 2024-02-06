@@ -15,6 +15,9 @@ type (
 	Starter interface {
 		Start() error
 		Addr() string
+	}
+
+	HealthClientBuilder interface {
 		HealthCheckClient() (service.HealthChecker, error)
 	}
 
@@ -73,7 +76,7 @@ func (s *ServiceGroup) waitUntilHealthy(starters []Starter) error {
 	for _, st := range starters {
 		go func(st Starter) {
 			defer w.Done()
-			err := s.waitForHealthy(st)
+			err := s.waitForHealthy(st.(HealthClientBuilder))
 			if err != nil {
 				q.Queue(err)
 			}
@@ -96,7 +99,7 @@ func (s *ServiceGroup) startStarter(st Starter) {
 	}()
 }
 
-func (s *ServiceGroup) waitForHealthy(st Starter) (err error) {
+func (s *ServiceGroup) waitForHealthy(st HealthClientBuilder) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	cli, err := st.HealthCheckClient()
@@ -135,16 +138,6 @@ func (s *ServiceGroup) WaitToStop() error {
 	}
 	w.Wait()
 	return errors.Join(errs...)
-}
-
-func (s *ServiceGroup) Stop(ctx context.Context, st Starter) error {
-	_, ok := s.activeServices[st]
-	if !ok {
-		return nil
-	}
-	delete(s.activeServices, st)
-	return nil
-	// return waitToStopService(svc)
 }
 
 func waitToStopService(svc *activeService) error {

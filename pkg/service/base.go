@@ -164,8 +164,3 @@ func WithContext(ctx context.Context) Option {
 		s.Ctx = ctx
 	}
 }
-
-type HealthChecker interface {
-	CheckOk(ctx context.Context) error
-	Close() error
-}
