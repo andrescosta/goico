@@ -48,19 +48,19 @@ type GrpcConn struct {
 	Listener GrpcListener
 }
 
-type HttpConn struct {
+type HTTPConn struct {
 	ClientBuilder HTTPClient
 	Listener      HTTPListener
 }
 
-func (s HttpConn) ClientBuilderOrDefault() HTTPClient {
+func (s HTTPConn) ClientBuilderOrDefault() HTTPClient {
 	if s.ClientBuilder == nil {
 		return DefaultHTTPClient
 	}
 	return s.ClientBuilder
 }
 
-func (s HttpConn) ListenerOrDefault() HTTPListener {
+func (s HTTPConn) ListenerOrDefault() HTTPListener {
 	if s.Listener == nil {
 		return DefaultHTTPListener
 	}
@@ -84,7 +84,7 @@ func (NetConn) Listen(addr string) (net.Listener, error) {
 	return net.Listen("tcp", addr)
 }
 
-func (NetConn) NewHTTPClient(addr string) (*http.Client, error) {
+func (NetConn) NewHTTPClient(_ string) (*http.Client, error) {
 	transport := http.DefaultTransport
 	return &http.Client{
 		Timeout:   1 * time.Second,

@@ -92,34 +92,35 @@ func (s *Service) Dispose() {
 	s.Svc.Dispose()
 }
 
-type CacheServiceClient struct {
+type Client struct {
 	serverAddr       string
 	conn             *rpc.ClientConn
 	client           event.CacheServiceClient
 	broadcasterEvent *broadcaster.Broadcaster[*event.Event]
 }
 
-func NewCacheServiceClient(ctx context.Context, addr string, d service.GrpcDialer) (*CacheServiceClient, error) {
+func NewClient(ctx context.Context, addr string, d service.GrpcDialer) (*Client, error) {
 	conn, err := d.Dial(ctx, addr)
 	if err != nil {
 		return nil, err
 	}
 	client := event.NewCacheServiceClient(conn)
-	return &CacheServiceClient{
+	return &Client{
 		serverAddr: addr,
 		conn:       conn,
 		client:     client,
 	}, nil
 }
 
-func (c *CacheServiceClient) Close() error {
+func (c *Client) Close() error {
+	var err error
 	if c.broadcasterEvent != nil {
-		c.broadcasterEvent.Stop()
+		err = errors.Join(c.broadcasterEvent.Stop())
 	}
-	return c.conn.Close()
+	return errors.Join(c.conn.Close(), err)
 }
 
-func (c *CacheServiceClient) ListenerForEvents(ctx context.Context) (*broadcaster.Listener[*event.Event], error) {
+func (c *Client) ListenerForEvents(ctx context.Context) (*broadcaster.Listener[*event.Event], error) {
 	if c.broadcasterEvent == nil {
 		if err := c.startListenerForEvents(ctx); err != nil {
 			return nil, err
@@ -128,7 +129,7 @@ func (c *CacheServiceClient) ListenerForEvents(ctx context.Context) (*broadcaste
 	return c.broadcasterEvent.Subscribe()
 }
 
-func (c *CacheServiceClient) startListenerForEvents(ctx context.Context) error {
+func (c *Client) startListenerForEvents(ctx context.Context) error {
 	cb := broadcaster.Start[*event.Event](ctx)
 	c.broadcasterEvent = cb
 	s, err := c.client.Events(ctx, &event.Empty{})

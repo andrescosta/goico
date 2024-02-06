@@ -17,11 +17,11 @@ func (c *HealthCheckClient) Close() error {
 	return nil
 }
 
-func (c *HealthCheckClient) CheckOk(ctx context.Context) error {
-	return checkServiceHealth(ctx, c.Builder, c.ServerAddr)
+func (c *HealthCheckClient) CheckOk(_ context.Context) error {
+	return checkServiceHealth(c.Builder, c.ServerAddr)
 }
 
-func checkServiceHealth(ctx context.Context, s service.HTTPClient, addr string) error {
+func checkServiceHealth(s service.HTTPClient, addr string) error {
 	url, err := url.Parse("http://" + addr + "/health")
 	if err != nil {
 		return err

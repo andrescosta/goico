@@ -9,7 +9,7 @@ import (
 )
 
 type Container struct {
-	service.HttpConn
+	service.HTTPConn
 	Svc  *Service
 	Name string
 }

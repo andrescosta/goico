@@ -9,16 +9,16 @@ import (
 )
 
 type Container struct {
-	service.HttpConn
+	service.HTTPConn
 	Svc  *Service
 	Name string
 }
 
-func (s *Container) HealthCheckClient() (service.HealthChecker, error) {
-	if s.Svc == nil {
+func (c *Container) HealthCheckClient() (service.HealthChecker, error) {
+	if c.Svc == nil {
 		return nil, errors.New("service not set")
 	}
-	return s.Svc.HelthCheckClient(s.ClientBuilder), nil
+	return c.Svc.HelthCheckClient(c.ClientBuilder), nil
 }
 
 func (c *Container) Addr() string {

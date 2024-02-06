@@ -212,9 +212,9 @@ func (s *Service) initializeRouter(opts *commonOptions) (r *mux.Router) {
 	return
 }
 
-func (g *Service) HelthCheckClient(c service.HTTPClient) *HealthCheckClient {
+func (s *Service) HelthCheckClient(c service.HTTPClient) *HealthCheckClient {
 	return &HealthCheckClient{
-		ServerAddr: g.base.Addr,
+		ServerAddr: s.base.Addr,
 		Builder:    c,
 	}
 }
