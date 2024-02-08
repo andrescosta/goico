@@ -80,7 +80,6 @@ func newLogger(ctxInfo map[string]string, cfg config) (*zerolog.Logger, io.Write
 		writers = append(writers, io.Discard)
 	}
 	mw := io.MultiWriter(writers...)
-	zerolog.SetGlobalLevel(level)
 	ctx := zerolog.New(mw).With().Timestamp()
 	if cfg.Caller {
 		ctx = ctx.Caller()
@@ -88,7 +87,7 @@ func newLogger(ctxInfo map[string]string, cfg config) (*zerolog.Logger, io.Write
 	for k, v := range ctxInfo {
 		ctx = ctx.Str(k, v)
 	}
-	logger := ctx.Logger()
+	logger := ctx.Logger().Level(level)
 	return &logger, writerCloser
 }
 

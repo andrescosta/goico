@@ -152,6 +152,10 @@ func (g *Service) DoServe(listener net.Listener) error {
 	return nil
 }
 
+func (g *Service) Stop() {
+	g.base.Stop()
+}
+
 func (g *Service) Dispose() {
 	logger := zerolog.Ctx(g.base.Ctx)
 	if g.closeableFn != nil {
