@@ -116,7 +116,10 @@ func (s *Table[S]) All() ([]S, error) {
 		}
 	}
 	errs := make([]error, 0)
-	iter := s.db.db.NewIter(prefixIterOptions(k.encodepreffix()))
+	iter, err := s.db.db.NewIter(prefixIterOptions(k.encodepreffix()))
+	if err != nil {
+		return nil, err
+	}
 	for iter.First(); iter.Valid(); iter.Next() {
 		d, err := s.marshaler.Unmarshal(iter.Value())
 		if err != nil {
