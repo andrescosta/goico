@@ -1,5 +1,5 @@
 # Goico: The Jobico Framework
-
+[![Go Report Card](https://goreportcard.com/badge/github.com/andrescosta/goico)](https://goreportcard.com/report/github.com/andrescosta/goico)
 ## Overview:
 
 **Goico** is a specialized framework meticulously crafted to support the development and evolution of Jobico, the innovative job execution platform. Tailored to meet the unique requirements of Jobico, Goico offers a versatile set of features and capabilities, empowering developers to create services, expose REST or gRPC APIs, and build headless worker services seamlessly.
