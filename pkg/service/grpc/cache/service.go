@@ -8,7 +8,7 @@ import (
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/grpc"
 	"github.com/andrescosta/goico/pkg/service/grpc/cache/event"
-	grpcstream "github.com/andrescosta/goico/pkg/service/grpc/stream"
+	"github.com/andrescosta/goico/pkg/service/grpc/grpcstream"
 	rpc "google.golang.org/grpc"
 )
 
