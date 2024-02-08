@@ -77,6 +77,10 @@ func New(opts ...Option) (*Base, error) {
 	return svc, nil
 }
 
+func (s *Base) Stop() {
+	s.done()
+}
+
 func (s *Base) Started() {
 	s.meta.StartTime = time.Now()
 }

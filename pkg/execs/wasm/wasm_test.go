@@ -115,7 +115,7 @@ func Test(t *testing.T) {
 	}
 	dir := t.TempDir()
 	ctx := context.Background()
-	runtime, err := wasm.NewRuntime(dir)
+	runtime, err := wasm.NewRuntimeWithCompilationCache(dir)
 	test.Nil(t, err)
 	defer func() {
 		runtime.Close(ctx)
@@ -141,7 +141,7 @@ func Test(t *testing.T) {
 func TestParalel(t *testing.T) {
 	dir := t.TempDir()
 	ctx := context.Background()
-	runtime, err := wasm.NewRuntime(dir)
+	runtime, err := wasm.NewRuntimeWithCompilationCache(dir)
 	test.Nil(t, err)
 	defer func() {
 		err := runtime.Close(ctx)

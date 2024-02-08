@@ -49,7 +49,28 @@ func NotEmpty(t *testing.T, o interface{}) {
 	switch obj.Kind() {
 	case reflect.Slice, reflect.Map, reflect.Chan:
 		if obj.Len() == 0 {
-			t.Errorf("expected data got empty slice")
+			t.Errorf("expected data got empty reference")
+			t.FailNow()
+		}
+	case reflect.String:
+		if obj.String() == "" {
+			t.Errorf("expected data got empty string")
+			t.FailNow()
+		}
+	default:
+		t.Errorf("expected slice/chan/map")
+		t.FailNow()
+	}
+}
+
+func Len(t *testing.T, o interface{}, len1 int) {
+	t.Helper()
+	obj := reflect.ValueOf(o)
+	//exhaustive:ignore only for Slice, Map and Chan
+	switch obj.Kind() {
+	case reflect.Slice, reflect.Map, reflect.Chan:
+		if obj.Len() != len1 {
+			t.Errorf("expected len equal to %d got %d", len1, obj.Len())
 			t.FailNow()
 		}
 	default:
@@ -74,10 +95,18 @@ func Empty(t *testing.T, o interface{}) {
 	}
 }
 
-func Equals(t *testing.T, i int, l int) {
+func Equals(t *testing.T, i any, l any) {
 	t.Helper()
-	if i != l {
-		t.Errorf("expected %d got %d", i, l)
+	if !reflect.DeepEqual(i, l) {
+		t.Errorf("expected the same values, got %v - %v", i, l)
+		t.FailNow()
+	}
+}
+
+func NotEquals(t *testing.T, i any, l any) {
+	t.Helper()
+	if reflect.DeepEqual(i, l) {
+		t.Errorf("expected different values, got %v - %v", i, l)
 		t.FailNow()
 	}
 }

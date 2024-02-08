@@ -8,7 +8,7 @@ import (
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/grpc"
 	"github.com/andrescosta/goico/pkg/service/grpc/cache/event"
-	"github.com/andrescosta/jobico/pkg/grpchelper"
+	grpcstream "github.com/andrescosta/goico/pkg/service/grpc/stream"
 	rpc "google.golang.org/grpc"
 )
 
@@ -137,7 +137,7 @@ func (c *Client) startListenerForEvents(ctx context.Context) error {
 		return err
 	}
 	go func() {
-		_ = grpchelper.Listen(ctx, s, cb)
+		_ = grpcstream.Listen(ctx, s, cb)
 	}()
 	return nil
 }

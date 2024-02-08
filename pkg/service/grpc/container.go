@@ -1,7 +1,6 @@
 package grpc
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -11,9 +10,8 @@ import (
 
 type Container struct {
 	service.GrpcConn
-	Cancel context.CancelFunc
-	Svc    *Service
-	Name   string
+	Svc  *Service
+	Name string
 }
 
 func (c *Container) HealthCheckClient() (service.HealthChecker, error) {

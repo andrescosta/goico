@@ -14,8 +14,10 @@ type Runtime struct {
 	runtimeConfig wazero.RuntimeConfig
 }
 
-func NewRuntime(tempDir string) (*Runtime, error) {
-	wruntime := &Runtime{}
+func NewRuntimeWithCompilationCache(tempDir string) (*Runtime, error) {
+	if tempDir == "" {
+		return nil, errors.New("directory cannot be empty")
+	}
 	if err := os.MkdirAll(tempDir, os.ModeExclusive); err != nil {
 		return nil, err
 	}
@@ -23,26 +25,32 @@ func NewRuntime(tempDir string) (*Runtime, error) {
 	if err != nil {
 		return nil, err
 	}
-	wruntime.cacheDir = &cacheDir
 	cache, err := wazero.NewCompilationCacheWithDir(cacheDir)
 	if err != nil {
 		err := os.RemoveAll(cacheDir)
 		return nil, err
 	}
-	wruntime.runtimeConfig = wazero.NewRuntimeConfig().
+	runtimeConfig := wazero.NewRuntimeConfig().
 		WithCompilationCache(cache).
 		WithCloseOnContextDone(true)
-	wruntime.cache = cache
-	return wruntime, nil
+	return &Runtime{
+		cacheDir:      &cacheDir,
+		cache:         cache,
+		runtimeConfig: runtimeConfig,
+	}, nil
 }
 
 func (r *Runtime) Close(ctx context.Context) error {
 	var errs error
-	if err := r.cache.Close(ctx); err != nil {
-		errs = errors.Join(errs, err)
+	if r.cache != nil {
+		if err := r.cache.Close(ctx); err != nil {
+			errs = errors.Join(errs, err)
+		}
 	}
-	if err := os.RemoveAll(*r.cacheDir); err != nil {
-		errs = errors.Join(errs, err)
+	if r.cacheDir != nil {
+		if err := os.RemoveAll(*r.cacheDir); err != nil {
+			errs = errors.Join(errs, err)
+		}
 	}
 	return errs
 }
