@@ -158,7 +158,7 @@ func (s *Service) DoServe(listener net.Listener) error {
 
 	logger.Debug().Msgf("HTTP service: started on %s", listener.Addr().String())
 	if !s.imsidecar {
-		s.base.Started()
+		s.base.SetStartedNow()
 	}
 
 	if err := s.server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {

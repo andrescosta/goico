@@ -85,7 +85,7 @@ func (s Service) DoServe(listener net.Listener) error {
 	var w sync.WaitGroup
 	w.Add(2)
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
-	s.Base.Started()
+	s.Base.SetStartedNow()
 	var err error
 	go func() {
 		defer w.Done()
