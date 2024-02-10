@@ -113,8 +113,11 @@ func NewSidecar(opts ...Option[*SidecarOptions]) (*Service, error) {
 	setDefaults(svc)
 
 	opt := &SidecarOptions{
-		common: &commonOptions{},
-		base:   nil,
+		common: &commonOptions{
+			stackLevelOnError: StackLevelSimple,
+			listener:          service.DefaultHTTPListener,
+		},
+		base: nil,
 	}
 	for _, o := range opts {
 		o.Apply(opt)
@@ -289,7 +292,7 @@ func WithHealthCheck[T *SidecarOptions | *ServiceOptions](healthChkFn HealthChec
 
 func WithListener[T *SidecarOptions | *ServiceOptions](listener service.HTTPListener) Option[T] {
 	return option.NewFuncOption(func(t T) {
-		if t != nil {
+		if t != nil && listener != nil {
 			switch v := any(t).(type) {
 			case *SidecarOptions:
 				v.common.listener = listener

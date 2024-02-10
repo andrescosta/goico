@@ -1,4 +1,4 @@
-package grpcstream
+package stream
 
 import (
 	"context"
@@ -11,39 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func Recv[T proto.Message](ctx context.Context, s grpc.ClientStream, c chan<- T) error {
-	logger := zerolog.Ctx(ctx)
-	for {
-		select {
-		case <-ctx.Done():
-			if err := s.CloseSend(); err != nil {
-				logger.Warn().AnErr("error", err).Msg("Recv: Error while closing stream.")
-			}
-			return ctx.Err()
-		case <-s.Context().Done():
-			if err := s.CloseSend(); err != nil {
-				logger.Warn().AnErr("error", err).Msg("Recv: Error while closing stream.")
-			}
-			return s.Context().Err()
-		default:
-			var t T
-			p := t.ProtoReflect().New()
-			err := s.RecvMsg(p.Interface())
-			if err != nil {
-				if status.Code(err) != codes.Canceled {
-					logger.Warn().AnErr("error", err).Msg("Recv: error getting message")
-				}
-				continue
-			}
-			select {
-			case c <- p.Interface().(T):
-			default:
-			}
-		}
-	}
-}
-
-func Listen[T proto.Message](ctx context.Context, s grpc.ClientStream, bc *broadcaster.Broadcaster[T]) error {
+func Recv[T proto.Message](ctx context.Context, s grpc.ClientStream, bc *broadcaster.Broadcaster[T]) error {
 	logger := zerolog.Ctx(ctx)
 	for {
 		select {

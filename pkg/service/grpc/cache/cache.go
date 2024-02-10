@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/andrescosta/goico/pkg/broadcaster"
@@ -9,22 +10,28 @@ import (
 )
 
 type Cache[K comparable, V any] struct {
-	name      string
-	defs      *sync.Map
-	listeners *broadcaster.Broadcaster[*event.Event]
+	name        string
+	defs        *sync.Map
+	broadcaster *broadcaster.Broadcaster[*event.Event]
 }
 
-func New[K comparable, V any](ctx context.Context, name string) *Cache[K, V] {
-	b := broadcaster.Start[*event.Event](ctx)
+func New[K comparable, V any](ctx context.Context, name string, publish bool) *Cache[K, V] {
+	var b *broadcaster.Broadcaster[*event.Event]
+	if publish {
+		b = broadcaster.Start[*event.Event](ctx)
+	}
 	return &Cache[K, V]{
-		name:      name,
-		defs:      &sync.Map{},
-		listeners: b,
+		name:        name,
+		defs:        &sync.Map{},
+		broadcaster: b,
 	}
 }
 
 func (c *Cache[K, V]) Close() error {
-	return c.listeners.Stop()
+	if c.broadcaster != nil {
+		return c.broadcaster.Stop()
+	}
+	return nil
 }
 
 func (c *Cache[K, V]) Name() string {
@@ -32,7 +39,10 @@ func (c *Cache[K, V]) Name() string {
 }
 
 func (c *Cache[K, V]) Subscribe() (*broadcaster.Listener[*event.Event], error) {
-	l, err := c.listeners.Subscribe()
+	if c.broadcaster == nil {
+		return nil, errors.New("broadcasting disabled")
+	}
+	l, err := c.broadcaster.Subscribe()
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +50,10 @@ func (c *Cache[K, V]) Subscribe() (*broadcaster.Listener[*event.Event], error) {
 }
 
 func (c *Cache[K, V]) Unsubscribe(l *broadcaster.Listener[*event.Event]) error {
-	return c.listeners.Unsubscribe(l)
+	if c.broadcaster == nil {
+		return errors.New("broadcasting disabled")
+	}
+	return c.broadcaster.Unsubscribe(l)
 }
 
 func (c *Cache[K, V]) AddOrUpdate(k K, v V) error {
@@ -49,7 +62,10 @@ func (c *Cache[K, V]) AddOrUpdate(k K, v V) error {
 		Type: event.Event_Add,
 		Name: c.name,
 	}
-	return c.listeners.Write(&e)
+	if c.broadcaster != nil {
+		return c.broadcaster.Write(&e)
+	}
+	return nil
 }
 
 func (c *Cache[K, V]) Delete(k K) error {
@@ -58,7 +74,10 @@ func (c *Cache[K, V]) Delete(k K) error {
 		Type: event.Event_Delete,
 		Name: c.name,
 	}
-	return c.listeners.Write(&e)
+	if c.broadcaster != nil {
+		return c.broadcaster.Write(&e)
+	}
+	return nil
 }
 
 func (c *Cache[K, V]) Update(k K, v V) error {
@@ -67,7 +86,10 @@ func (c *Cache[K, V]) Update(k K, v V) error {
 		Type: event.Event_Update,
 		Name: c.name,
 	}
-	return c.listeners.Write(&e)
+	if c.broadcaster != nil {
+		return c.broadcaster.Write(&e)
+	}
+	return nil
 }
 
 func (c *Cache[K, V]) Get(k K) (V, bool) {

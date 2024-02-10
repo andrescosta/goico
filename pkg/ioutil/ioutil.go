@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -79,19 +78,43 @@ func Dirs(pathDir string) ([]os.DirEntry, error) {
 	return f, nil
 }
 
+type File struct {
+	Name  string
+	Bytes []byte
+}
+
 func ReadOldestFile(path, preffix, suffix string) ([]byte, *string, error) {
-	files, err := topNfilesSorted(path, preffix, suffix, 1)
+	files, err := ReadOldestFiles(path, preffix, suffix, 1)
 	if err != nil {
 		return nil, nil, err
 	}
 	if len(files) == 0 {
 		return nil, nil, nil
 	}
-	data, err := os.ReadFile(files[0].fullName)
+	return files[0].Bytes, &files[0].Name, nil
+}
+
+func ReadOldestFiles(path, preffix, suffix string, n int) ([]File, error) {
+	files, err := topNfilesSorted(path, preffix, suffix, n)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return data, &files[0].fullName, nil
+	if len(files) == 0 {
+		return nil, nil
+	}
+	ret := make([]File, len(files))
+	for i, f := range files {
+		data, err := os.ReadFile(f.fullName)
+		if err != nil {
+			return nil, err
+		}
+		retf := File{
+			Name:  f.fullName,
+			Bytes: data,
+		}
+		ret[i] = retf
+	}
+	return ret, nil
 }
 
 func LastLines(file string, nlines int, skipEmpty bool, noincludecrlf bool) ([]string, error) {
@@ -217,8 +240,6 @@ func filesSorted(path string, preffix, suffix string) ([]file, error) {
 	sort.Slice(files, func(i, j int) bool {
 		in1, _ := files[i].entry.Info()
 		in2, _ := files[j].entry.Info()
-		fmt.Printf("%s-%d\n", in1.Name(), in1.ModTime().Unix())
-		fmt.Printf("%s-%d\n", in2.Name(), in2.ModTime().Unix())
 		return in1.ModTime().Unix() < in2.ModTime().Unix()
 	})
 	return files, nil

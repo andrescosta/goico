@@ -20,7 +20,6 @@ type Service struct {
 	Base           *service.Base
 	start          StartFn
 	sidecarService *http.Service
-	cancelContext  context.CancelFunc
 }
 
 type Option interface {
@@ -48,11 +47,9 @@ func New(opts ...Option) (*Service, error) {
 		o.Apply(opt)
 	}
 	s := &Service{}
-	ctx, cancel := context.WithCancel(opt.ctx)
-	s.cancelContext = cancel
 	service, err := service.New(
 		service.WithName(opt.name),
-		service.WithContext(ctx),
+		service.WithContext(opt.ctx),
 		service.WithKind("headless"),
 		service.WithAddr(opt.addr),
 	)
@@ -62,7 +59,7 @@ func New(opts ...Option) (*Service, error) {
 	s.Base = service
 	s.start = opt.starter
 	// creates an HTTP service to serve metadata and health information over http
-	h, err := http.NewSidecar(
+	sidecar, err := http.NewSidecar(
 		http.WithPrimaryService(s.Base),
 		http.WithHealthCheck[*http.SidecarOptions](opt.healthCheckFN),
 		http.WithListener[*http.SidecarOptions](opt.listener),
@@ -70,7 +67,7 @@ func New(opts ...Option) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.sidecarService = h
+	s.sidecarService = sidecar
 	return s, nil
 }
 
@@ -92,8 +89,8 @@ func (s Service) DoServe(listener net.Listener) error {
 	var err error
 	go func() {
 		defer w.Done()
-		defer s.cancelContext()
 		err = s.start(s.Base.Ctx)
+		s.Base.Stop()
 	}()
 	go func() {
 		defer w.Done()

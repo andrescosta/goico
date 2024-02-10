@@ -17,6 +17,7 @@ import (
 	"github.com/andrescosta/goico/pkg/log"
 	httpsvc "github.com/andrescosta/goico/pkg/service/http"
 	"github.com/andrescosta/goico/pkg/service/http/httptest"
+	"github.com/andrescosta/goico/pkg/test"
 )
 
 type (
@@ -409,21 +410,18 @@ func run(t *testing.T, ss []scenario) {
 				env.Restore(b)
 			})
 			setEnv(s.env())
+			_, _, err := env.Load("echo")
+			test.Nil(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			svc, err := getService(ctx, s)
-			if err != nil {
-				t.Fatalf("Not expected error:%s", err)
-				return
-			}
+			test.Nil(t, err)
 			if !debug {
 				log.DisableLog()
 			}
 			s.exec(t, svc)
 			cancel()
 			err = <-svc.Servedone
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			test.Nil(t, err)
 		})
 	}
 }

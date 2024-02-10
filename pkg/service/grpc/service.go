@@ -134,7 +134,8 @@ func (g *Service) DoServe(listener net.Listener) error {
 		if g.healthCheckSrv != nil {
 			g.healthCheckSrv.Shutdown()
 		}
-		g.grpcServer.GracefulStop()
+		g.grpcServer.Stop()
+		logger.Debug().Msgf("Stopped")
 	}()
 	logger.Debug().Msgf("GRPC Server: started on %s", g.base.Addr)
 	g.base.Started()

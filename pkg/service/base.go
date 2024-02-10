@@ -5,12 +5,9 @@ import (
 	"errors"
 	"io"
 	"net"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/andrescosta/goico/pkg/collection"
-	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/log"
 	"github.com/andrescosta/goico/pkg/service/meta"
 	"github.com/andrescosta/goico/pkg/service/obs"
@@ -35,7 +32,7 @@ type Base struct {
 	Addr         string
 	OtelProvider *obs.OtelProvider
 	Ctx          context.Context
-	done         context.CancelFunc
+	cancel       context.CancelFunc
 	logWriter    io.WriteCloser
 }
 
@@ -53,12 +50,7 @@ func New(opts ...Option) (*Base, error) {
 		opt(svc)
 	}
 
-	// .env files loading
-	if _, _, err := env.Load(svc.meta.Name); err != nil {
-		return nil, err
-	}
-	// OS signal handling
-	svc.Ctx, svc.done = signal.NotifyContext(svc.Ctx, syscall.SIGINT, syscall.SIGTERM)
+	svc.Ctx, svc.cancel = context.WithCancel(svc.Ctx)
 
 	// log initialization
 	logger, logWriter := log.NewWithContext(map[string]string{"service": svc.meta.Name})
@@ -78,7 +70,7 @@ func New(opts ...Option) (*Base, error) {
 }
 
 func (s *Base) Stop() {
-	s.done()
+	s.cancel()
 }
 
 func (s *Base) Started() {
@@ -109,7 +101,7 @@ func (s *Base) Metadata() map[string]string {
 
 // Waits for the done signal and stops dependant providers.
 func (s *Base) waitForDoneAndEndTheWorld() {
-	defer s.done()
+	defer s.cancel()
 
 	logger := zerolog.Ctx(s.Ctx)
 	logger.Debug().Msg("Service: waiting")

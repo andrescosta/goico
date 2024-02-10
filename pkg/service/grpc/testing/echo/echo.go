@@ -4,9 +4,11 @@ import (
 	context "context"
 	"log"
 	"net"
+	"time"
 
 	"github.com/andrescosta/goico/pkg/service/grpc"
 	"github.com/andrescosta/goico/pkg/service/grpc/svcmeta"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	rpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
@@ -77,10 +79,20 @@ func (s *Service) Dispose() {
 }
 
 func (s *Service) Client(ctx context.Context) (EchoClient, error) {
-	conn, err := rpc.DialContext(ctx, "",
-		rpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
-			return s.listener.Dial()
-		}), rpc.WithTransportCredentials(insecure.NewCredentials()))
+	return s.ClientWithTimeout(ctx, nil)
+}
+
+func (s *Service) ClientWithTimeout(ctx context.Context, timeoutd *time.Duration) (EchoClient, error) {
+	ops := make([]rpc.DialOption, 0)
+	ops = append(ops, rpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+		return s.listener.Dial()
+	}), rpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	if timeoutd != nil {
+		ops = append(ops, rpc.WithUnaryInterceptor(
+			timeout.UnaryClientInterceptor(*timeoutd)))
+	}
+	conn, err := rpc.DialContext(ctx, "", ops...)
 	if err != nil {
 		var t EchoClient
 		return t, err

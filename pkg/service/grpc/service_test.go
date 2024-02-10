@@ -15,6 +15,7 @@ import (
 	"github.com/andrescosta/goico/pkg/service/grpc/svcmeta"
 	"github.com/andrescosta/goico/pkg/service/grpc/testing/echo"
 	"github.com/andrescosta/goico/pkg/service/http/httptest"
+	"github.com/andrescosta/goico/pkg/test"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	status "google.golang.org/grpc/status"
@@ -29,6 +30,7 @@ type (
 		env() []string
 		server() *Server
 		healthCheckFn() grpc.HealthCheckFn
+		timeout() *time.Duration
 	}
 
 	config struct {
@@ -36,6 +38,7 @@ type (
 		grpcserver     *Server
 		healthCheckFnn grpc.HealthCheckFn
 		name           string
+		timeoutv       *time.Duration
 	}
 )
 
@@ -119,6 +122,10 @@ func (s *Server) NoEcho(_ context.Context, e *echo.EchoRequest) (*echo.Void, err
 	return s.noechofn(e)
 }
 
+func durptr(d time.Duration) *time.Duration {
+	return &d
+}
+
 func Test(t *testing.T) {
 	t.Parallel()
 	run(t, []scenario{
@@ -148,6 +155,7 @@ func Test(t *testing.T) {
 			config: config{
 				name:       "timeout",
 				grpcserver: serverTimeout,
+				timeoutv:   durptr(1 * time.Second),
 			},
 		},
 		getMetadata{
@@ -239,13 +247,9 @@ func (s getMetadata) exec(ctx context.Context, t *testing.T, svc *echo.Service, 
 	}
 }
 
-func (s upsTimeout) exec(_ context.Context, t *testing.T, _ *echo.Service, c echo.EchoClient) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+func (s upsTimeout) exec(ctx context.Context, t *testing.T, _ *echo.Service, c echo.EchoClient) {
 	_, err := c.Echo(ctx, &echo.EchoRequest{Code: 0, Message: "ups"})
-	if err == nil {
-		t.Error("expected error got <nil>")
-	}
+	test.NotNil(t, err)
 }
 
 func (s echos) exec(ctx context.Context, t *testing.T, _ *echo.Service, c echo.EchoClient) {
@@ -317,27 +321,29 @@ func run(t *testing.T, ss []scenario) {
 				env.Restore(b)
 			})
 			setEnv(s.env())
+			_, _, err := env.Load("echo")
+			test.Nil(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			svc, err := echo.NewWithServer(ctx, s.server(), s.healthCheckFn())
-			if err != nil {
-				t.Errorf("not expected error:%v", err)
-			}
+			test.Nil(t, err)
 			go func() {
 				errch <- svc.Serve()
 			}()
 			if !debug {
 				log.DisableLog()
 			}
-			c, err := svc.Client(ctx)
-			if err != nil {
-				t.Errorf("not expected error:%v", err)
+			var c echo.EchoClient
+			if s.timeout() == nil {
+				c, err = svc.Client(ctx)
+				test.Nil(t, err)
+			} else {
+				c, err = svc.ClientWithTimeout(ctx, s.timeout())
+				test.Nil(t, err)
 			}
 			s.exec(ctx, t, svc, c)
 			cancel()
 			err = <-errch
-			if err != nil {
-				t.Errorf("not expected error:%v", err)
-			}
+			test.Nil(t, err)
 			svc.Dispose()
 			if !s.server().closed {
 				t.Error("server not closed")
@@ -351,6 +357,7 @@ func (c config) server() *Server                   { return c.grpcserver }
 func (c config) sname() string                     { return c.name }
 func (c config) env() []string                     { return c.envv }
 func (c config) healthCheckFn() grpc.HealthCheckFn { return c.healthCheckFnn }
+func (c config) timeout() *time.Duration           { return c.timeoutv }
 
 func setEnv(e []string) {
 	if e != nil {

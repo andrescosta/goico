@@ -83,7 +83,7 @@ func (s *ServiceGroup) waitUntilHealthy(starters []Starter) error {
 		}(st)
 	}
 	w.Wait()
-	return errors.Join(q.Slice()...)
+	return errors.Join(q.DequeueAll()...)
 }
 
 func (s *ServiceGroup) startStarter(st Starter) {

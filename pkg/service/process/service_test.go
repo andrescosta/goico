@@ -16,6 +16,7 @@ import (
 	"github.com/andrescosta/goico/pkg/log"
 	"github.com/andrescosta/goico/pkg/service/http/httptest"
 	"github.com/andrescosta/goico/pkg/service/process"
+	"github.com/andrescosta/goico/pkg/test"
 )
 
 var debug = false
@@ -193,10 +194,11 @@ func run(t *testing.T, ss []scenario) {
 				env.Restore(b)
 			})
 			setEnv(s.env())
+			_, _, err := env.Load("echo")
+			test.Nil(t, err)
 			ctx, cancel := context.WithCancel(context.Background())
 			started := make(chan bool, 1)
 			proc, err := process.New(
-				// process.WithSidecarListener(service.DefaultHttpListener),
 				process.WithContext(ctx),
 				process.WithName("executor"),
 				process.WithAddr(localhost),
