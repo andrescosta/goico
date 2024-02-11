@@ -10,6 +10,7 @@ import (
 )
 
 func TestOk(t *testing.T) {
+	t.Parallel()
 	e := syncutil.NewGValue(-1)
 	i := 1
 	e.Store(i)
@@ -18,6 +19,7 @@ func TestOk(t *testing.T) {
 }
 
 func TestError(t *testing.T) {
+	t.Parallel()
 	err := errors.New("test")
 	e := syncutil.GValue[error]{}
 	e.Store(err)
@@ -26,16 +28,19 @@ func TestError(t *testing.T) {
 }
 
 func TestNilError(t *testing.T) {
+	t.Parallel()
 	var e syncutil.GValue[error]
 	test.Nil(t, e.Load())
 }
 
 func TestEmptyString(t *testing.T) {
+	t.Parallel()
 	var e syncutil.GValue[string]
 	test.Equals(t, e.Load(), "")
 }
 
 func TestStringNilPtr(t *testing.T) {
+	t.Parallel()
 	var e syncutil.GValue[*string]
 	v := e.Load()
 	j := (*string)(nil)
@@ -45,6 +50,7 @@ func TestStringNilPtr(t *testing.T) {
 }
 
 func TestRace(t *testing.T) {
+	t.Parallel()
 	var w sync.WaitGroup
 	v := syncutil.NewGValue(-1)
 	ch := make(chan struct{})
@@ -71,6 +77,7 @@ func TestRace(t *testing.T) {
 }
 
 func TestRaceBool(t *testing.T) {
+	t.Parallel()
 	var w sync.WaitGroup
 	v := syncutil.NewGValue(false)
 	ch := make(chan struct{})

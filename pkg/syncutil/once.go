@@ -2,53 +2,59 @@ package syncutil
 
 import (
 	"context"
+	"errors"
 	"sync"
 )
 
 type OnceDisposable struct {
-	done    *GValue[bool]
-	diposed *GValue[bool]
-	err     *GValue[error]
-	m       sync.Mutex
+	done       *GValue[bool]
+	disposed   *GValue[bool]
+	errDone    *GValue[error]
+	errDispose *GValue[error]
+	m          sync.Mutex
 }
 
 func NewOnceDisposable() *OnceDisposable {
 	return &OnceDisposable{
-		done:    NewGValue(false),
-		diposed: NewGValue(false),
-		err:     &GValue[error]{},
+		done:       NewGValue(false),
+		disposed:   NewGValue(false),
+		errDone:    &GValue[error]{},
+		errDispose: &GValue[error]{},
 	}
 }
 
 func (o *OnceDisposable) Do(ctx context.Context, f func(ctx context.Context) error) error {
-	if !o.done.Load() && !o.diposed.Load() {
+	if o.disposed.Load() {
+		return errors.New("already disposed")
+	}
+	if !o.done.Load() && !o.disposed.Load() {
 		o.m.Lock()
 		defer o.m.Unlock()
-		if !o.done.Load() && !o.diposed.Load() {
+		if !o.done.Load() && !o.disposed.Load() {
 			defer o.done.Store(true)
 			err := f(ctx)
 			if err != nil {
-				o.err.Store(err)
+				o.errDone.Store(err)
 			}
 		}
 	}
-	return o.err.Load()
+	return o.errDone.Load()
 }
 
-func (o *OnceDisposable) Dispose(ctx context.Context, f func(ctx context.Context) error) {
-	if o.done.Load() && !o.diposed.Load() {
+func (o *OnceDisposable) Dispose(ctx context.Context, f func(ctx context.Context) error) error {
+	if !o.done.Load() {
+		return errors.New("task not done")
+	}
+	if !o.disposed.Load() {
 		o.m.Lock()
 		defer o.m.Unlock()
-		if o.done.Load() && !o.diposed.Load() {
-			defer o.diposed.Store(true)
+		if o.done.Load() && !o.disposed.Load() {
+			defer o.disposed.Store(true)
 			err := f(ctx)
 			if err != nil {
-				o.err.Store(err)
+				o.errDispose.Store(err)
 			}
 		}
 	}
-}
-
-func (o *OnceDisposable) Err() error {
-	return o.err.Load()
+	return o.errDispose.Load()
 }

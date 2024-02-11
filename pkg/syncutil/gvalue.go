@@ -26,8 +26,8 @@ func (v *GValue[T]) Store(val T) {
 	v.value.Store(val)
 }
 
-func (v *GValue[T]) Swap(new T) T {
-	val, ok := v.value.Swap(new).(T)
+func (v *GValue[T]) Swap(newval T) T {
+	val, ok := v.value.Swap(newval).(T)
 	if !ok {
 		var t T
 		return t
@@ -35,8 +35,8 @@ func (v *GValue[T]) Swap(new T) T {
 	return val
 }
 
-func (v *GValue[T]) CompareAndSwap(old T, new T) bool {
-	return v.value.CompareAndSwap(old, new)
+func (v *GValue[T]) CompareAndSwap(oldval T, newval T) bool {
+	return v.value.CompareAndSwap(oldval, newval)
 }
 
 func (v *GValue[T]) Init() {
