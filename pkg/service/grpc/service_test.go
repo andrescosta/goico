@@ -126,7 +126,7 @@ func durptr(d time.Duration) *time.Duration {
 	return &d
 }
 
-func Test(t *testing.T) {
+func TestGRPC(t *testing.T) {
 	t.Parallel()
 	run(t, []scenario{
 		echos{

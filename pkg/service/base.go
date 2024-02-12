@@ -39,10 +39,8 @@ type Base struct {
 func New(opts ...Option) (*Base, error) {
 	// Instantiate with default values
 	svc := &Base{
-		Ctx: context.Background(),
-		meta: &meta.Data{
-			StartTime: time.Now(),
-		},
+		Ctx:          context.Background(),
+		meta:         &meta.Data{},
 		OtelProvider: nil,
 	}
 
@@ -73,7 +71,7 @@ func (s *Base) Stop() {
 	s.cancel()
 }
 
-func (s *Base) Started() {
+func (s *Base) SetStartedNow() {
 	s.meta.StartTime = time.Now()
 }
 

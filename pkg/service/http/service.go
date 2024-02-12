@@ -41,8 +41,9 @@ type (
 )
 
 type SidecarOptions struct {
-	common *commonOptions
-	base   *service.Base
+	common      *commonOptions
+	base        *service.Base
+	disableOtel bool
 }
 
 type httpOptions interface {
@@ -54,17 +55,18 @@ type Option[T httpOptions] interface {
 }
 
 type ServiceOptions struct {
-	addr         string
-	common       *commonOptions
-	ctx          context.Context
-	name         string
-	initRoutesFn initRoutesFn
+	addr             string
+	common           *commonOptions
+	ctx              context.Context
+	name             string
+	profilingEnabled bool
 }
 
 type commonOptions struct {
 	healthChkFn       HealthCheckFn
 	stackLevelOnError StackLevel
 	listener          service.HTTPListener
+	initRoutesFn      initRoutesFn
 }
 
 func New(opts ...Option[*ServiceOptions]) (*Service, error) {
@@ -75,11 +77,11 @@ func New(opts ...Option[*ServiceOptions]) (*Service, error) {
 		common: &commonOptions{
 			stackLevelOnError: StackLevelSimple,
 			listener:          service.DefaultHTTPListener,
+			initRoutesFn:      func(ctx context.Context, r *mux.Router) error { return nil },
 		},
-		ctx:          context.Background(),
-		initRoutesFn: func(ctx context.Context, r *mux.Router) error { return nil },
-		addr:         "",
-		name:         "",
+		ctx:  context.Background(),
+		addr: "",
+		name: "",
 	}
 
 	for _, o := range opts {
@@ -99,10 +101,10 @@ func New(opts ...Option[*ServiceOptions]) (*Service, error) {
 	svc.base = base
 	svc.Listener = opt.common.listener
 	// Mux Router initialization
-	router := svc.initializeRouter(opt.common)
+	router := svc.initializeRouter(opt)
 
 	//// routes initialization
-	if err := opt.initRoutesFn(svc.base.Ctx, router); err != nil {
+	if err := opt.common.initRoutesFn(svc.base.Ctx, router); err != nil {
 		return nil, err
 	}
 	return svc, nil
@@ -116,6 +118,7 @@ func NewSidecar(opts ...Option[*SidecarOptions]) (*Service, error) {
 		common: &commonOptions{
 			stackLevelOnError: StackLevelSimple,
 			listener:          service.DefaultHTTPListener,
+			initRoutesFn:      func(ctx context.Context, r *mux.Router) error { return nil },
 		},
 		base: nil,
 	}
@@ -127,7 +130,11 @@ func NewSidecar(opts ...Option[*SidecarOptions]) (*Service, error) {
 	svc.Listener = opt.common.listener
 
 	// Mux Router initialization
-	_ = svc.initializeRouter(opt.common)
+	router := svc.initializeRouterSidecar(*opt)
+	//// routes initialization
+	if err := opt.common.initRoutesFn(svc.base.Ctx, router); err != nil {
+		return nil, err
+	}
 	return svc, nil
 }
 
@@ -158,7 +165,7 @@ func (s *Service) DoServe(listener net.Listener) error {
 
 	logger.Debug().Msgf("HTTP service: started on %s", listener.Addr().String())
 	if !s.imsidecar {
-		s.base.Started()
+		s.base.SetStartedNow()
 	}
 
 	if err := s.server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -196,22 +203,46 @@ func (s *Service) metadataHandler(w http.ResponseWriter, _ *http.Request) {
 	WriteJSONBody(b, s.base.Metadata(), http.StatusOK, `{error:"error getting metadata"}`, w)
 }
 
-func (s *Service) initializeRouter(opts *commonOptions) (r *mux.Router) {
+func (s *Service) initializeRouter(opts *ServiceOptions) (router *mux.Router) {
 	// Mux Router config
-	r = mux.NewRouter()
+	router = mux.NewRouter()
 	//// setting middlewares
-	rf := RecoveryFunc{StackLevel: opts.stackLevelOnError}
-	r.Use(rf.TryToRecover())
-	r.Use(obs.GetLoggingMiddleware)
-	s.base.OtelProvider.InstrRouter(s.base.Name(), r)
+	rf := RecoveryFunc{StackLevel: opts.common.stackLevelOnError}
+	router.Use(rf.TryToRecover())
+	router.Use(obs.GetLoggingMiddleware)
+	s.base.OtelProvider.InstrRouter(s.base.Name(), router)
 	if env.Bool("metadata.enabled", false) {
-		r.HandleFunc("/meta", s.metadataHandler)
+		router.HandleFunc("/meta", s.metadataHandler)
 	}
-	if opts.healthChkFn != nil {
-		s.healthCheckFunc = opts.healthChkFn
-		r.HandleFunc("/health", s.healthCheckHandler)
+	if opts.common.healthChkFn != nil {
+		s.healthCheckFunc = opts.common.healthChkFn
+		router.HandleFunc("/health", s.healthCheckHandler)
 	}
-	s.server = newHTTPServer(r)
+	if opts.profilingEnabled {
+		service.AttachProfilingHandlers(context.Background(), router)
+	}
+	s.server = newHTTPServer(router)
+	return
+}
+
+func (s *Service) initializeRouterSidecar(opt SidecarOptions) (router *mux.Router) {
+	// Mux Router config
+	router = mux.NewRouter()
+	//// setting middlewares
+	rf := RecoveryFunc{StackLevel: opt.common.stackLevelOnError}
+	router.Use(rf.TryToRecover())
+	router.Use(obs.GetLoggingMiddleware)
+	if !opt.disableOtel {
+		s.base.OtelProvider.InstrRouter(s.base.Name(), router)
+	}
+	if env.Bool("metadata.enabled.sidecar", false) {
+		router.HandleFunc("/meta", s.metadataHandler)
+	}
+	if opt.common.healthChkFn != nil {
+		s.healthCheckFunc = opt.common.healthChkFn
+		router.HandleFunc("/health", s.healthCheckHandler)
+	}
+	s.server = newHTTPServer(router)
 	return
 }
 
@@ -240,9 +271,16 @@ func setDefaults(s *Service) {
 }
 
 // Setters
-func WithInitRoutesFn(i initRoutesFn) Option[*ServiceOptions] {
-	return option.NewFuncOption(func(s *ServiceOptions) {
-		s.initRoutesFn = i
+func WithInitRoutesFn[T *SidecarOptions | *ServiceOptions](i initRoutesFn) Option[T] {
+	return option.NewFuncOption(func(t T) {
+		if t != nil {
+			switch v := any(t).(type) {
+			case *SidecarOptions:
+				v.common.initRoutesFn = i
+			case *ServiceOptions:
+				v.common.initRoutesFn = i
+			}
+		}
 	})
 }
 
@@ -306,5 +344,17 @@ func WithListener[T *SidecarOptions | *ServiceOptions](listener service.HTTPList
 func WithPrimaryService(svc *service.Base) Option[*SidecarOptions] {
 	return option.NewFuncOption(func(opts *SidecarOptions) {
 		opts.base = svc
+	})
+}
+
+func WithDisableOtel(otel bool) Option[*SidecarOptions] {
+	return option.NewFuncOption(func(opts *SidecarOptions) {
+		opts.disableOtel = otel
+	})
+}
+
+func WithProfilingEnabled(p bool) Option[*ServiceOptions] {
+	return option.NewFuncOption(func(s *ServiceOptions) {
+		s.profilingEnabled = p
 	})
 }

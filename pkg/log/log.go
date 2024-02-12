@@ -2,7 +2,6 @@ package log
 
 import (
 	"io"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -75,7 +74,6 @@ func newLogger(ctxInfo map[string]string, cfg config) (*zerolog.Logger, io.Write
 	}
 	level := cfg.Level
 	if len(writers) == 0 {
-		log.Println("Console and file loggers disabled. Logging is not enabled.")
 		level = zerolog.Disabled
 		writers = append(writers, io.Discard)
 	}

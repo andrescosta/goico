@@ -35,7 +35,7 @@ func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthC
 		httpsvc.WithName("listener-test"),
 		httpsvc.WithStackLevelOnError[*httpsvc.ServiceOptions](stackLevel),
 		httpsvc.WithHealthCheck[*httpsvc.ServiceOptions](hfn),
-		httpsvc.WithInitRoutesFn(func(ctx context.Context, r *mux.Router) error {
+		httpsvc.WithInitRoutesFn[*httpsvc.ServiceOptions](func(ctx context.Context, r *mux.Router) error {
 			for _, h := range handlers {
 				r.HandleFunc(h.Path, h.Handler).Schemes(h.Scheme)
 			}

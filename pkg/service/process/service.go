@@ -9,6 +9,7 @@ import (
 	"github.com/andrescosta/goico/pkg/option"
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/http"
+	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 )
 
@@ -26,12 +27,13 @@ type Option interface {
 	Apply(*Options)
 }
 type Options struct {
-	starter       StartFn
-	healthCheckFN http.HealthCheckFn
-	ctx           context.Context
-	name          string
-	addr          string
-	listener      service.HTTPListener
+	starter          StartFn
+	healthCheckFN    http.HealthCheckFn
+	ctx              context.Context
+	name             string
+	addr             string
+	listener         service.HTTPListener
+	profilingEnabled bool
 }
 
 func noop(_ context.Context) error { return nil }
@@ -46,8 +48,8 @@ func New(opts ...Option) (*Service, error) {
 	for _, o := range opts {
 		o.Apply(opt)
 	}
-	s := &Service{}
-	service, err := service.New(
+	svc := &Service{}
+	base, err := service.New(
 		service.WithName(opt.name),
 		service.WithContext(opt.ctx),
 		service.WithKind("headless"),
@@ -56,19 +58,25 @@ func New(opts ...Option) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.Base = service
-	s.start = opt.starter
+	svc.Base = base
+	svc.start = opt.starter
 	// creates an HTTP service to serve metadata and health information over http
 	sidecar, err := http.NewSidecar(
-		http.WithPrimaryService(s.Base),
+		http.WithPrimaryService(svc.Base),
 		http.WithHealthCheck[*http.SidecarOptions](opt.healthCheckFN),
 		http.WithListener[*http.SidecarOptions](opt.listener),
+		http.WithInitRoutesFn[*http.SidecarOptions](func(ctx context.Context, router *mux.Router) error {
+			if opt.profilingEnabled {
+				service.AttachProfilingHandlers(ctx, router)
+			}
+			return nil
+		}),
 	)
 	if err != nil {
 		return nil, err
 	}
-	s.sidecarService = sidecar
-	return s, nil
+	svc.sidecarService = sidecar
+	return svc, nil
 }
 
 func (s Service) Serve() error {
@@ -85,7 +93,7 @@ func (s Service) DoServe(listener net.Listener) error {
 	var w sync.WaitGroup
 	w.Add(2)
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
-	s.Base.Started()
+	s.Base.SetStartedNow()
 	var err error
 	go func() {
 		defer w.Done()
@@ -143,5 +151,11 @@ func WithAddr(addr string) Option {
 func WithSidecarListener(l service.HTTPListener) Option {
 	return option.NewFuncOption(func(h *Options) {
 		h.listener = l
+	})
+}
+
+func WithProfilingEnabled(p bool) Option {
+	return option.NewFuncOption(func(s *Options) {
+		s.profilingEnabled = p
 	})
 }

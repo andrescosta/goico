@@ -43,7 +43,7 @@ func TestInitRouteErrors(t *testing.T) {
 		WithContext(context.Background()),
 		WithAddr(localhost),
 		WithName("listener-test"),
-		WithInitRoutesFn(func(ctx context.Context, r *mux.Router) error {
+		WithInitRoutesFn[*ServiceOptions](func(ctx context.Context, r *mux.Router) error {
 			return errors.New("errror")
 		}),
 	)
@@ -58,7 +58,7 @@ func TestSamePort(t *testing.T) {
 		WithContext(context.Background()),
 		WithAddr(localhost),
 		WithName("listener-test"),
-		WithInitRoutesFn(func(ctx context.Context, r *mux.Router) error {
+		WithInitRoutesFn[*ServiceOptions](func(ctx context.Context, r *mux.Router) error {
 			r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {}).Schemes("http")
 			return nil
 		}),
@@ -82,7 +82,7 @@ func TestSamePort(t *testing.T) {
 		WithContext(context.Background()),
 		WithAddr(addr),
 		WithName("listener-test"),
-		WithInitRoutesFn(func(ctx context.Context, r *mux.Router) error {
+		WithInitRoutesFn[*ServiceOptions](func(ctx context.Context, r *mux.Router) error {
 			r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {}).Schemes("http")
 			return nil
 		}),
