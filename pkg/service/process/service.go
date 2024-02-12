@@ -3,7 +3,6 @@ package process
 import (
 	"context"
 	"net"
-	"net/http/pprof"
 	"os"
 	"sync"
 
@@ -49,8 +48,8 @@ func New(opts ...Option) (*Service, error) {
 	for _, o := range opts {
 		o.Apply(opt)
 	}
-	s := &Service{}
-	service, err := service.New(
+	svc := &Service{}
+	base, err := service.New(
 		service.WithName(opt.name),
 		service.WithContext(opt.ctx),
 		service.WithKind("headless"),
@@ -59,16 +58,16 @@ func New(opts ...Option) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.Base = service
-	s.start = opt.starter
+	svc.Base = base
+	svc.start = opt.starter
 	// creates an HTTP service to serve metadata and health information over http
 	sidecar, err := http.NewSidecar(
-		http.WithPrimaryService(s.Base),
+		http.WithPrimaryService(svc.Base),
 		http.WithHealthCheck[*http.SidecarOptions](opt.healthCheckFN),
 		http.WithListener[*http.SidecarOptions](opt.listener),
-		http.WithInitRoutesFn[*http.SidecarOptions](func(_ context.Context, router *mux.Router) error {
+		http.WithInitRoutesFn[*http.SidecarOptions](func(ctx context.Context, router *mux.Router) error {
 			if opt.profilingEnabled {
-				router.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
+				service.ConfigProfilingHandlers(ctx, router)
 			}
 			return nil
 		}),
@@ -76,8 +75,8 @@ func New(opts ...Option) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.sidecarService = sidecar
-	return s, nil
+	svc.sidecarService = sidecar
+	return svc, nil
 }
 
 func (s Service) Serve() error {

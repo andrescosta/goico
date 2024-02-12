@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"sync"
 	"time"
@@ -220,7 +219,7 @@ func (s *Service) initializeRouter(opts *ServiceOptions) (router *mux.Router) {
 		router.HandleFunc("/health", s.healthCheckHandler)
 	}
 	if opts.profilingEnabled {
-		router.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
+		service.ConfigProfilingHandlers(context.Background(), router)
 	}
 	s.server = newHTTPServer(router)
 	return

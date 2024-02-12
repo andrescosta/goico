@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http/pprof"
 	"os"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/grpc/svcmeta"
 	"github.com/andrescosta/goico/pkg/service/http"
-	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -122,10 +120,7 @@ func New(opts ...Option) (*Service, error) {
 		sidecar, err := http.NewSidecar(
 			http.WithPrimaryService(svc.base),
 			http.WithListener[*http.SidecarOptions](opt.listener),
-			http.WithInitRoutesFn[*http.SidecarOptions](func(_ context.Context, router *mux.Router) error {
-				router.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
-				return nil
-			}),
+			http.WithInitRoutesFn[*http.SidecarOptions](service.ConfigProfilingHandlers),
 		)
 		if err != nil {
 			return nil, err
