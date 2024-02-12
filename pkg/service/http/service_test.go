@@ -116,7 +116,7 @@ var handlers = []httptest.PathHandler{
 	},
 }
 
-func Test(t *testing.T) {
+func TestHTTP(t *testing.T) {
 	t.Parallel()
 	run(t, []scenario{
 		echo{
@@ -490,5 +490,6 @@ func setEnv(e []string) {
 		return
 	}
 	env.Setargs("metadata.enabled=true")
+	env.Setargs("metadata.enabled.sidecar=true")
 	httptest.SetHTTPServerTimeouts(1 * time.Second)
 }

@@ -3,12 +3,14 @@ package process
 import (
 	"context"
 	"net"
+	"net/http/pprof"
 	"os"
 	"sync"
 
 	"github.com/andrescosta/goico/pkg/option"
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/http"
+	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 )
 
@@ -26,12 +28,13 @@ type Option interface {
 	Apply(*Options)
 }
 type Options struct {
-	starter       StartFn
-	healthCheckFN http.HealthCheckFn
-	ctx           context.Context
-	name          string
-	addr          string
-	listener      service.HTTPListener
+	starter          StartFn
+	healthCheckFN    http.HealthCheckFn
+	ctx              context.Context
+	name             string
+	addr             string
+	listener         service.HTTPListener
+	profilingEnabled bool
 }
 
 func noop(_ context.Context) error { return nil }
@@ -63,6 +66,12 @@ func New(opts ...Option) (*Service, error) {
 		http.WithPrimaryService(s.Base),
 		http.WithHealthCheck[*http.SidecarOptions](opt.healthCheckFN),
 		http.WithListener[*http.SidecarOptions](opt.listener),
+		http.WithInitRoutesFn[*http.SidecarOptions](func(_ context.Context, router *mux.Router) error {
+			if opt.profilingEnabled {
+				router.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
+			}
+			return nil
+		}),
 	)
 	if err != nil {
 		return nil, err
@@ -143,5 +152,11 @@ func WithAddr(addr string) Option {
 func WithSidecarListener(l service.HTTPListener) Option {
 	return option.NewFuncOption(func(h *Options) {
 		h.listener = l
+	})
+}
+
+func WithProfilingEnabled(p bool) Option {
+	return option.NewFuncOption(func(s *Options) {
+		s.profilingEnabled = p
 	})
 }

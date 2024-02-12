@@ -55,7 +55,7 @@ type (
 	}
 )
 
-func Test(t *testing.T) {
+func TestProcess(t *testing.T) {
 	t.Parallel()
 	run(t, []scenario{
 		getMetadata{
@@ -254,7 +254,7 @@ func setEnv(e []string) {
 		env.Setargs(e...)
 		return
 	}
-	env.Setargs("metadata.enabled=true")
+	env.Setargs("metadata.enabled.sidecar=true")
 	httptest.SetHTTPServerTimeouts(1 * time.Second)
 }
 

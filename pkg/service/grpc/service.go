@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http/pprof"
 	"os"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	"github.com/andrescosta/goico/pkg/option"
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/grpc/svcmeta"
+	"github.com/andrescosta/goico/pkg/service/http"
+	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -33,13 +36,15 @@ type Option interface {
 	Apply(*Options)
 }
 type Options struct {
-	addr        string
-	ctx         context.Context
-	name        string
-	newService  NewServiceFn
-	serviceDesc *grpc.ServiceDesc
-	healthCheck HealthCheckFn
-	listener    service.GrpcListener
+	addr             string
+	ctx              context.Context
+	name             string
+	newService       NewServiceFn
+	serviceDesc      *grpc.ServiceDesc
+	healthCheck      HealthCheckFn
+	listener         service.GrpcListener
+	profilingEnabled bool
+	pprofAddr        string
 }
 
 type Service struct {
@@ -49,6 +54,8 @@ type Service struct {
 	healthCheck    HealthCheckFn
 	healthCheckSrv *health.Server
 	closeableFn    Closeable
+	sidecarService *http.Service
+	pprofAddr      string
 }
 
 type Closeable interface {
@@ -110,18 +117,43 @@ func New(opts ...Option) (*Service, error) {
 		svc.healthCheck = opt.healthCheck
 		svc.healthCheckSrv = healthCheckSrv
 	}
+
+	if opt.profilingEnabled {
+		sidecar, err := http.NewSidecar(
+			http.WithPrimaryService(svc.base),
+			http.WithListener[*http.SidecarOptions](opt.listener),
+			http.WithInitRoutesFn[*http.SidecarOptions](func(_ context.Context, router *mux.Router) error {
+				router.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
+				return nil
+			}),
+		)
+		if err != nil {
+			return nil, err
+		}
+		svc.sidecarService = sidecar
+		svc.pprofAddr = opt.pprofAddr
+	}
 	return svc, nil
 }
 
 func (g *Service) Serve() error {
+	var listenerSidecar net.Listener
+	if g.sidecarService != nil {
+		var err error
+		listenerSidecar, err = g.sidecarService.Listener.Listen(g.pprofAddr)
+		if err != nil {
+			return err
+		}
+	}
 	listener, err := g.listener.Listen(g.base.Addr)
 	if err != nil {
 		return err
 	}
-	return g.DoServe(listener)
+	return g.DoServe(listener, listenerSidecar)
 }
 
-func (g *Service) DoServe(listener net.Listener) error {
+func (g *Service) DoServe(listener net.Listener, listenerSidecar net.Listener) error {
+	defer g.base.Stop()
 	logger := zerolog.Ctx(g.base.Ctx)
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
 	if g.base.Addr == "" {
@@ -143,7 +175,13 @@ func (g *Service) DoServe(listener net.Listener) error {
 	if g.healthCheck != nil {
 		go g.healthcheckIt(g.base.Ctx)
 	}
-
+	if listenerSidecar != nil {
+		go func() {
+			if err := g.sidecarService.DoServe(listenerSidecar); err != nil {
+				logger.Err(err).Msg("error helper service")
+			}
+		}()
+	}
 	if err := g.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
@@ -262,5 +300,17 @@ func WithServiceDesc(serviceDesc *grpc.ServiceDesc) Option {
 func WithListener(l service.GrpcListener) Option {
 	return option.NewFuncOption(func(r *Options) {
 		r.listener = l
+	})
+}
+
+func WithProfilingEnabled(p bool) Option {
+	return option.NewFuncOption(func(r *Options) {
+		r.profilingEnabled = p
+	})
+}
+
+func WithPProfAddr(addr string) Option {
+	return option.NewFuncOption(func(r *Options) {
+		r.pprofAddr = addr
 	})
 }
