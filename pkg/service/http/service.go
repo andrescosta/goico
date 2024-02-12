@@ -219,7 +219,7 @@ func (s *Service) initializeRouter(opts *ServiceOptions) (router *mux.Router) {
 		router.HandleFunc("/health", s.healthCheckHandler)
 	}
 	if opts.profilingEnabled {
-		service.AttachProfilingHandlers(context.Background(), router)
+		service.AttachProfilingHandlers(router)
 	}
 	s.server = newHTTPServer(router)
 	return
