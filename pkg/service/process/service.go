@@ -67,7 +67,7 @@ func New(opts ...Option) (*Service, error) {
 		http.WithListener[*http.SidecarOptions](opt.listener),
 		http.WithInitRoutesFn[*http.SidecarOptions](func(ctx context.Context, router *mux.Router) error {
 			if opt.profilingEnabled {
-				service.ConfigProfilingHandlers(ctx, router)
+				service.AttachProfilingHandlers(ctx, router)
 			}
 			return nil
 		}),

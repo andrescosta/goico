@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func ConfigProfilingHandlers(_ context.Context, router *mux.Router) error {
+func AttachProfilingHandlers(_ context.Context, router *mux.Router) error {
 	router.PathPrefix("/debug/pprof/").Handler(http.DefaultServeMux)
 	return nil
 }

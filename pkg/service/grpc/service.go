@@ -42,7 +42,7 @@ type Options struct {
 	healthCheck      HealthCheckFn
 	listener         service.GrpcListener
 	profilingEnabled bool
-	pprofAddr        string
+	pprofAddr        *string
 }
 
 type Service struct {
@@ -53,7 +53,7 @@ type Service struct {
 	healthCheckSrv *health.Server
 	closeableFn    Closeable
 	sidecarService *http.Service
-	pprofAddr      string
+	pprofAddr      *string
 }
 
 type Closeable interface {
@@ -117,10 +117,13 @@ func New(opts ...Option) (*Service, error) {
 	}
 
 	if opt.profilingEnabled {
+		if opt.pprofAddr == nil {
+			return nil, errors.New("pprofAddr is nill and profilingEnabled is true.")
+		}
 		sidecar, err := http.NewSidecar(
 			http.WithPrimaryService(svc.base),
 			http.WithListener[*http.SidecarOptions](opt.listener),
-			http.WithInitRoutesFn[*http.SidecarOptions](service.ConfigProfilingHandlers),
+			http.WithInitRoutesFn[*http.SidecarOptions](service.AttachProfilingHandlers),
 		)
 		if err != nil {
 			return nil, err
@@ -135,7 +138,7 @@ func (g *Service) Serve() error {
 	var listenerSidecar net.Listener
 	if g.sidecarService != nil {
 		var err error
-		listenerSidecar, err = g.sidecarService.Listener.Listen(g.pprofAddr)
+		listenerSidecar, err = g.sidecarService.Listener.Listen(*g.pprofAddr)
 		if err != nil {
 			return err
 		}
@@ -304,7 +307,7 @@ func WithProfilingEnabled(p bool) Option {
 	})
 }
 
-func WithPProfAddr(addr string) Option {
+func WithPProfAddr(addr *string) Option {
 	return option.NewFuncOption(func(r *Options) {
 		r.pprofAddr = addr
 	})
