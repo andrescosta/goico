@@ -13,6 +13,7 @@ import (
 	"github.com/andrescosta/goico/pkg/service"
 	"github.com/andrescosta/goico/pkg/service/grpc/svcmeta"
 	"github.com/andrescosta/goico/pkg/service/http"
+	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -118,12 +119,15 @@ func New(opts ...Option) (*Service, error) {
 
 	if opt.profilingEnabled {
 		if opt.pprofAddr == nil {
-			return nil, errors.New("pprofAddr is nill and profilingEnabled is true.")
+			return nil, errors.New("pprofAddr is nill and profilingEnabled is true")
 		}
 		sidecar, err := http.NewSidecar(
 			http.WithPrimaryService(svc.base),
 			http.WithListener[*http.SidecarOptions](opt.listener),
-			http.WithInitRoutesFn[*http.SidecarOptions](service.AttachProfilingHandlers),
+			http.WithInitRoutesFn[*http.SidecarOptions](func(_ context.Context, r *mux.Router) error {
+				service.AttachProfilingHandlers(r)
+				return nil
+			}),
 		)
 		if err != nil {
 			return nil, err
