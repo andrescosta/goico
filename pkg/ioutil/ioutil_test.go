@@ -76,8 +76,7 @@ func TestWriteToRandomFile(t *testing.T) {
 	preffix := "test"
 	suffix := "ioutil"
 	content := []byte("testing TestWriteToRandomFile")
-
-	f, err := WriteToRandomFile(tempDir, preffix, suffix, content, 0o700)
+	f, err := WriteToRandomFile(tempDir, preffix, suffix, content)
 	test.Nil(t, err, fmt.Sprintf("WriteToRandomFile %q : %s", tempDir, err))
 	if !strings.HasPrefix(filepath.Base(f), preffix) {
 		t.Fatalf("The file name %s does not start with %s", f, preffix)
