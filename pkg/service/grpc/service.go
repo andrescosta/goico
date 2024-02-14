@@ -254,7 +254,7 @@ func (g *Service) Dial(d service.GrpcDialer) (*grpc.ClientConn, error) {
 	return d.Dial(g.base.Ctx, addr)
 }
 
-func (g *Service) HelthCheckClient(d service.GrpcDialer) (*HealthCheckClient, error) {
+func (g *Service) NewHelthCheckClient(d service.GrpcDialer) (*HealthCheckClient, error) {
 	conn, err := g.Dial(d)
 	if err != nil {
 		return nil, err

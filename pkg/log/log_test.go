@@ -221,7 +221,7 @@ func TestLogToConsole(t *testing.T) {
 			zerolog.DebugLevel,
 			"test_debug_nofile",
 			"test_debug_nofile",
-			func(t *testing.T, s string) {
+			func(t *testing.T, _ string) {
 				file := filepath.Join(env.Workdir(), "console_debug_nofile.log")
 				e, err := ioutil.FileExists(file)
 				test.Nil(t, err)
@@ -243,7 +243,7 @@ func TestLogToConsole(t *testing.T) {
 			zerolog.DebugLevel,
 			"test_debug_nofile",
 			"test_debug_nofile",
-			func(t *testing.T, s string) {
+			func(t *testing.T, _ string) {
 				file := filepath.Join(env.Workdir(), "console_debug_file.log")
 				e, err := ioutil.FileExists(file)
 				test.Nil(t, err)

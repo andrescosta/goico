@@ -261,7 +261,7 @@ func setEnv(e []string) {
 func getHealthCheckHandler(s scenario) func(ctx context.Context) (map[string]string, error) {
 	ss, ok := s.(healthCheck)
 	if ok {
-		return func(ctx context.Context) (map[string]string, error) {
+		return func(_ context.Context) (map[string]string, error) {
 			var err error
 			if ss.health.HasErrors {
 				err = errors.New("Some errors")

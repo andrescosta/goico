@@ -9,7 +9,7 @@ import (
 )
 
 func Test(t *testing.T) {
-	q := NewQueue[int]()
+	q := NewSyncQueue[int]()
 	s := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	for _, i := range s {
 		q.Queue(i)
@@ -21,7 +21,7 @@ func Test(t *testing.T) {
 }
 
 func TestDequeAll(t *testing.T) {
-	q := NewQueue[int]()
+	q := NewSyncQueue[int]()
 	s := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	for _, i := range s {
 		q.Queue(i)
@@ -32,7 +32,7 @@ func TestDequeAll(t *testing.T) {
 }
 
 func TestPeekSlice(t *testing.T) {
-	q := NewQueue[int]()
+	q := NewSyncQueue[int]()
 	s := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	for _, i := range s {
 		q.Queue(i)
@@ -42,7 +42,7 @@ func TestPeekSlice(t *testing.T) {
 }
 
 func TestPeekSliceAll(t *testing.T) {
-	q := NewQueue[int]()
+	q := NewSyncQueue[int]()
 	s := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	for _, i := range s {
 		q.Queue(i)
@@ -53,7 +53,7 @@ func TestPeekSliceAll(t *testing.T) {
 }
 
 func TestClear(t *testing.T) {
-	q := NewQueue[int]()
+	q := NewSyncQueue[int]()
 	s := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	for _, i := range s {
 		q.Queue(i)
@@ -65,7 +65,7 @@ func TestClear(t *testing.T) {
 }
 
 func TestPeek(t *testing.T) {
-	q := NewQueue[int]()
+	q := NewSyncQueue[int]()
 	s := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	for _, i := range s {
 		q.Queue(i)
@@ -80,7 +80,7 @@ func TestPeek(t *testing.T) {
 }
 
 func TestDequeueSlice(t *testing.T) {
-	q := NewQueue[int]()
+	q := NewSyncQueue[int]()
 	s := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	for _, i := range s {
 		q.Queue(i)
@@ -92,7 +92,7 @@ func TestDequeueSlice(t *testing.T) {
 }
 
 func TestDequeueSliceMax(t *testing.T) {
-	q := NewQueue[int]()
+	q := NewSyncQueue[int]()
 	s := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	for _, i := range s {
 		q.Queue(i)

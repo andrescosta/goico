@@ -14,11 +14,11 @@ type Container struct {
 	Name string
 }
 
-func (c *Container) HealthCheckClient() (service.HealthChecker, error) {
+func (c *Container) NewHealthCheckClient() (service.HealthChecker, error) {
 	if c.Svc == nil {
 		return nil, errors.New("service not set")
 	}
-	return c.Svc.HelthCheckClient(c.Dialer)
+	return c.Svc.NewHelthCheckClient(c.Dialer)
 }
 
 func (c *Container) Addr() string {

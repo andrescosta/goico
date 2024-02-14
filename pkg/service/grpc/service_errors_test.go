@@ -22,7 +22,7 @@ func TestListenNoError(t *testing.T) {
 		WithAddr(localhost),
 		WithContext(ctx),
 		WithServiceDesc(&echo.Echo_ServiceDesc),
-		WithNewServiceFn(func(ctx context.Context) (any, error) {
+		WithNewServiceFn(func(_ context.Context) (any, error) {
 			return echo.EchoServer(&ServerNop{}), nil
 		}),
 	)
@@ -52,7 +52,7 @@ func TestWithNewServiceFnError(t *testing.T) {
 		WithAddr(localhost),
 		WithContext(context.Background()),
 		WithServiceDesc(&echo.Echo_ServiceDesc),
-		WithNewServiceFn(func(ctx context.Context) (any, error) {
+		WithNewServiceFn(func(_ context.Context) (any, error) {
 			return nil, errors.New("error creating service")
 		}),
 	)
@@ -70,7 +70,7 @@ func TestSamePort(t *testing.T) {
 		WithAddr(localhost),
 		WithContext(ctx),
 		WithServiceDesc(&echo.Echo_ServiceDesc),
-		WithNewServiceFn(func(ctx context.Context) (any, error) {
+		WithNewServiceFn(func(_ context.Context) (any, error) {
 			return echo.EchoServer(&ServerNop{}), nil
 		}),
 	)
@@ -90,7 +90,7 @@ func TestSamePort(t *testing.T) {
 		WithListener(service.DefaultGrpcListener),
 		WithContext(ctx),
 		WithServiceDesc(&echo.Echo_ServiceDesc),
-		WithNewServiceFn(func(ctx context.Context) (any, error) {
+		WithNewServiceFn(func(_ context.Context) (any, error) {
 			return echo.EchoServer(&ServerNop{}), nil
 		}),
 	)

@@ -102,14 +102,14 @@ var handlers = []httptest.PathHandler{
 	{
 		Scheme: "http",
 		Path:   "/panic",
-		Handler: func(rw http.ResponseWriter, r *http.Request) {
+		Handler: func(_ http.ResponseWriter, _ *http.Request) {
 			panic("panic!!!")
 		},
 	},
 	{
 		Scheme: "http",
 		Path:   "/timeout",
-		Handler: func(rw http.ResponseWriter, r *http.Request) {
+		Handler: func(rw http.ResponseWriter, _ *http.Request) {
 			time.Sleep(1 * time.Minute)
 			rw.WriteHeader(http.StatusOK)
 		},
@@ -454,7 +454,7 @@ func getStackLevel(s scenario) httpsvc.StackLevel {
 func getHealthCheckHandler(s scenario) func(ctx context.Context) (map[string]string, error) {
 	ss, ok := s.(healthCheck)
 	if ok {
-		return func(ctx context.Context) (map[string]string, error) {
+		return func(_ context.Context) (map[string]string, error) {
 			var err error
 			if ss.health.HasErrors {
 				err = errors.New("Some errors")

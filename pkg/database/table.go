@@ -25,16 +25,6 @@ type Table[S any] struct {
 	Tenant    string
 }
 
-// func NewTable[S any](db *Database, tenant string, name string, marshaler Marshaler[S]) *Table[S] {
-// 	table := &Table[S]{
-// 		marshaler: marshaler,
-// 		Name:      name,
-// 		Tenant:    tenant,
-// 		db:        db,
-// 	}
-// 	return table
-// }
-
 func NewTable[S any](db *Database, name string, tenant string, marshaler Marshaler[S]) *Table[S] {
 	table := &Table[S]{
 		marshaler: marshaler,

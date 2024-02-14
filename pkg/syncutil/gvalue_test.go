@@ -84,18 +84,18 @@ func TestRaceBool(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		w.Add(1)
 		if i%2 == 0 {
-			go func(i int) {
+			go func() {
 				defer w.Done()
 				<-ch
 				_ = v.Load()
 				v.Store(true)
-			}(i)
+			}()
 		} else {
-			go func(i int) {
+			go func() {
 				defer w.Done()
 				<-ch
 				v.Swap(false)
-			}(i)
+			}()
 		}
 	}
 	close(ch)

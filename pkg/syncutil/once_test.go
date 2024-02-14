@@ -20,7 +20,7 @@ func TestDo(t *testing.T) {
 		go func() {
 			defer w.Done()
 			<-ch
-			err := r.Do(context.Background(), func(ctx context.Context) error {
+			err := r.Do(context.Background(), func(_ context.Context) error {
 				v++
 				return nil
 			})
@@ -42,7 +42,7 @@ func TestDoDispose(t *testing.T) {
 		go func() {
 			defer wDo.Done()
 			<-chDo
-			err := init.Do(context.Background(), func(ctx context.Context) error {
+			err := init.Do(context.Background(), func(_ context.Context) error {
 				v++
 				return nil
 			})
@@ -59,7 +59,7 @@ func TestDoDispose(t *testing.T) {
 		go func() {
 			defer wDisponse.Done()
 			<-chDispose
-			err := init.Dispose(context.Background(), func(ctx context.Context) error {
+			err := init.Dispose(context.Background(), func(_ context.Context) error {
 				v++
 				return nil
 			})
@@ -82,7 +82,7 @@ func TestDoError(t *testing.T) {
 		go func() {
 			defer wDo.Done()
 			<-chDo
-			err := init.Do(context.Background(), func(ctx context.Context) error {
+			err := init.Do(context.Background(), func(_ context.Context) error {
 				return errDo
 			})
 			test.ErrorIs(t, err, errDo)
@@ -97,7 +97,7 @@ func TestDoError(t *testing.T) {
 		go func() {
 			defer wDisponse.Done()
 			<-chDispose
-			err := init.Dispose(context.Background(), func(ctx context.Context) error {
+			err := init.Dispose(context.Background(), func(_ context.Context) error {
 				v++
 				return nil
 			})
@@ -120,7 +120,7 @@ func TestDiposeError(t *testing.T) {
 		go func() {
 			defer wDo.Done()
 			<-chDo
-			err := init.Do(context.Background(), func(ctx context.Context) error {
+			err := init.Do(context.Background(), func(_ context.Context) error {
 				v++
 				return nil
 			})
@@ -137,7 +137,7 @@ func TestDiposeError(t *testing.T) {
 		go func() {
 			defer wDisponse.Done()
 			<-chDispose
-			err := init.Dispose(context.Background(), func(ctx context.Context) error {
+			err := init.Dispose(context.Background(), func(_ context.Context) error {
 				return errDispose
 			})
 			test.ErrorIs(t, err, errDispose)
@@ -158,7 +158,7 @@ func TestBothErrors(t *testing.T) {
 		go func() {
 			defer wDo.Done()
 			<-chDo
-			err := init.Do(context.Background(), func(ctx context.Context) error {
+			err := init.Do(context.Background(), func(_ context.Context) error {
 				return errDo
 			})
 			test.ErrorIs(t, err, errDo)
@@ -173,7 +173,7 @@ func TestBothErrors(t *testing.T) {
 		go func() {
 			defer wDisponse.Done()
 			<-chDispose
-			err := init.Dispose(context.Background(), func(ctx context.Context) error {
+			err := init.Dispose(context.Background(), func(_ context.Context) error {
 				return errDispose
 			})
 			test.ErrorIs(t, err, errDispose)
@@ -186,7 +186,7 @@ func TestBothErrors(t *testing.T) {
 func TestErrorCallDispose(t *testing.T) {
 	r := syncutil.NewOnceDisposable()
 	v := 0
-	err := r.Dispose(context.Background(), func(ctx context.Context) error {
+	err := r.Dispose(context.Background(), func(_ context.Context) error {
 		v++
 		return nil
 	})
@@ -197,18 +197,18 @@ func TestErrorCallDispose(t *testing.T) {
 func TestErrorCallDo(t *testing.T) {
 	r := syncutil.NewOnceDisposable()
 	v := 0
-	err := r.Do(context.Background(), func(ctx context.Context) error {
+	err := r.Do(context.Background(), func(_ context.Context) error {
 		v++
 		return nil
 	})
 	test.Nil(t, err)
-	err = r.Dispose(context.Background(), func(ctx context.Context) error {
+	err = r.Dispose(context.Background(), func(_ context.Context) error {
 		v++
 		return nil
 	})
 	test.Nil(t, err)
 	test.Equals(t, v, 2)
-	err = r.Do(context.Background(), func(ctx context.Context) error {
+	err = r.Do(context.Background(), func(_ context.Context) error {
 		v++
 		return nil
 	})

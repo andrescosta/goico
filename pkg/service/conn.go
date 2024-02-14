@@ -38,7 +38,7 @@ type (
 	HTTPTranporter interface {
 		Tranport(addr string) (*http.Transport, error)
 	}
-	HTTPClient interface {
+	HTTPClientBuilder interface {
 		NewHTTPClient(addr string) (*http.Client, error)
 	}
 )
@@ -49,11 +49,11 @@ type GrpcConn struct {
 }
 
 type HTTPConn struct {
-	ClientBuilder HTTPClient
+	ClientBuilder HTTPClientBuilder
 	Listener      HTTPListener
 }
 
-func (s HTTPConn) ClientBuilderOrDefault() HTTPClient {
+func (s HTTPConn) ClientBuilderOrDefault() HTTPClientBuilder {
 	if s.ClientBuilder == nil {
 		return DefaultHTTPClient
 	}
@@ -115,7 +115,7 @@ func (t *BufConn) Dial(_ context.Context, addr string) (*rpc.ClientConn, error) 
 		return nil, ErrEmptyAddress
 	}
 	l := t.listenerFor(addr)
-	ctxDialerOp := rpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) { return l.DialContext(ctx) })
+	ctxDialerOp := rpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) { return l.DialContext(ctx) })
 	timeOutOp := rpc.WithUnaryInterceptor(
 		timeout.UnaryClientInterceptor(t.timeout),
 	)
@@ -140,7 +140,7 @@ func (t *BufConn) Tranport(addr string) (*http.Transport, error) {
 	l := t.listenerFor(addr)
 	return &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			return l.DialContext(context.Background())
+			return l.DialContext(ctx)
 		},
 	}, nil
 }

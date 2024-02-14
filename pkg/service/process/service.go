@@ -63,9 +63,9 @@ func New(opts ...Option) (*Service, error) {
 	// creates an HTTP service to serve metadata and health information over http
 	sidecar, err := http.NewSidecar(
 		http.WithPrimaryService(svc.Base),
-		http.WithHealthCheck[*http.SidecarOptions](opt.healthCheckFN),
+		http.WithHealthCheckFn[*http.SidecarOptions](opt.healthCheckFN),
 		http.WithListener[*http.SidecarOptions](opt.listener),
-		http.WithInitRoutesFn[*http.SidecarOptions](func(ctx context.Context, router *mux.Router) error {
+		http.WithInitRoutesFn[*http.SidecarOptions](func(_ context.Context, router *mux.Router) error {
 			if opt.profilingEnabled {
 				service.AttachProfilingHandlers(router)
 			}
@@ -110,7 +110,7 @@ func (s Service) DoServe(listener net.Listener) error {
 	return err
 }
 
-func (s Service) HelthCheckClient(c service.HTTPClient) *http.HealthCheckClient {
+func (s Service) NewHelthCheckClient(c service.HTTPClientBuilder) *http.HealthCheckClient {
 	return &http.HealthCheckClient{
 		ServerAddr: s.Base.Addr,
 		Builder:    c,

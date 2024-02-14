@@ -70,7 +70,7 @@ func NewService[K comparable, V any](ctx context.Context, cache *Cache[K, V], op
 		grpc.WithAddr(s.AddrOrPanic()),
 		grpc.WithContext(ctx),
 		grpc.WithServiceDesc(&event.CacheService_ServiceDesc),
-		grpc.WithNewServiceFn(func(ctx context.Context) (any, error) {
+		grpc.WithNewServiceFn(func(_ context.Context) (any, error) {
 			return &server[K, V]{
 				cache: cache,
 			}, nil

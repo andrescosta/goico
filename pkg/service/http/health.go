@@ -10,7 +10,7 @@ import (
 
 type HealthCheckClient struct {
 	ServerAddr string
-	Builder    service.HTTPClient
+	Builder    service.HTTPClientBuilder
 }
 
 func (c *HealthCheckClient) Close() error {
@@ -21,7 +21,7 @@ func (c *HealthCheckClient) CheckOk(_ context.Context) error {
 	return checkServiceHealth(c.Builder, c.ServerAddr)
 }
 
-func checkServiceHealth(s service.HTTPClient, addr string) error {
+func checkServiceHealth(s service.HTTPClientBuilder, addr string) error {
 	url, err := url.Parse("http://" + addr + "/health")
 	if err != nil {
 		return err

@@ -108,7 +108,7 @@ var (
 			time.Sleep(1 * time.Minute)
 			return &echo.EchoResponse{Code: er.Code, Message: er.Message}, nil
 		},
-		noechofn: func(er *echo.EchoRequest) (*echo.Void, error) {
+		noechofn: func(_ *echo.EchoRequest) (*echo.Void, error) {
 			return &echo.Void{}, nil
 		},
 	}
@@ -293,7 +293,7 @@ func (s healthCheck) exec(ctx context.Context, t *testing.T, svc *echo.Service, 
 		time.Sleep(s.wait)
 	}
 	if !s.nocheck {
-		hc, err := svc.HealthCheckClient(ctx, svc.Name())
+		hc, err := svc.NewHealthCheckClient(ctx, svc.Name())
 		if err != nil {
 			t.Errorf("not expected error: %v", err)
 			return

@@ -77,7 +77,7 @@ func New(opts ...Option[*ServiceOptions]) (*Service, error) {
 		common: &commonOptions{
 			stackLevelOnError: StackLevelSimple,
 			listener:          service.DefaultHTTPListener,
-			initRoutesFn:      func(ctx context.Context, r *mux.Router) error { return nil },
+			initRoutesFn:      func(_ context.Context, _ *mux.Router) error { return nil },
 		},
 		ctx:  context.Background(),
 		addr: "",
@@ -118,7 +118,7 @@ func NewSidecar(opts ...Option[*SidecarOptions]) (*Service, error) {
 		common: &commonOptions{
 			stackLevelOnError: StackLevelSimple,
 			listener:          service.DefaultHTTPListener,
-			initRoutesFn:      func(ctx context.Context, r *mux.Router) error { return nil },
+			initRoutesFn:      func(_ context.Context, _ *mux.Router) error { return nil },
 		},
 		base: nil,
 	}
@@ -151,7 +151,7 @@ func (s *Service) DoServe(listener net.Listener) error {
 	logger := zerolog.Ctx(s.base.Ctx)
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
 
-	s.server.BaseContext = func(l net.Listener) context.Context { return s.base.Ctx }
+	s.server.BaseContext = func(_ net.Listener) context.Context { return s.base.Ctx }
 	errCh := make(chan error, 1)
 	go func() {
 		<-s.base.Ctx.Done()
@@ -246,7 +246,7 @@ func (s *Service) initializeRouterSidecar(opt SidecarOptions) (router *mux.Route
 	return
 }
 
-func (s *Service) HelthCheckClient(c service.HTTPClient) *HealthCheckClient {
+func (s *Service) HelthCheckClient(c service.HTTPClientBuilder) *HealthCheckClient {
 	return &HealthCheckClient{
 		ServerAddr: s.base.Addr,
 		Builder:    c,
@@ -315,7 +315,7 @@ func WithStackLevelOnError[T *SidecarOptions | *ServiceOptions](lvl StackLevel) 
 	})
 }
 
-func WithHealthCheck[T *SidecarOptions | *ServiceOptions](healthChkFn HealthCheckFn) Option[T] {
+func WithHealthCheckFn[T *SidecarOptions | *ServiceOptions](healthChkFn HealthCheckFn) Option[T] {
 	return option.NewFuncOption(func(t T) {
 		if t != nil {
 			switch v := any(t).(type) {

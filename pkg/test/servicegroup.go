@@ -17,19 +17,18 @@ type (
 		Addr() string
 	}
 
-	HealthClientBuilder interface {
-		HealthCheckClient() (service.HealthChecker, error)
+	HealthCheckClientBuilder interface {
+		NewHealthCheckClient() (service.HealthChecker, error)
 	}
 
 	activeService struct {
-		stopCh  chan *ErrWhileStopping
+		stopCh  chan *ErrService
 		starter Starter
-		Stopped bool
+		stopped bool
 	}
 
 	ServiceGroup struct {
-		activeServices    map[Starter]*activeService
-		httpClientBuilder service.HTTPClient
+		services map[Starter]*activeService
 	}
 )
 
@@ -40,7 +39,7 @@ type (
 		Addr string
 	}
 
-	ErrWhileStopping struct {
+	ErrService struct {
 		Starter Starter
 		Err     error
 	}
@@ -50,21 +49,20 @@ func (e ErrNotHealthy) Error() string {
 	return fmt.Sprintf("service at %s not healthy", e.Addr)
 }
 
-func (e ErrWhileStopping) Error() string {
+func (e ErrService) Error() string {
 	return fmt.Sprintf("error stopping %s: %v", e.Starter.Addr(), e.Err)
 }
 
-func NewServiceGroup(cliBuilder service.HTTPClient) *ServiceGroup {
+func NewServiceGroup() *ServiceGroup {
 	return &ServiceGroup{
-		activeServices:    make(map[Starter]*activeService),
-		httpClientBuilder: cliBuilder,
+		services: make(map[Starter]*activeService),
 	}
 }
 
-func (s *ServiceGroup) Start(starters []Starter) error {
+func (s *ServiceGroup) Start(starters ...Starter) error {
 	for _, st := range starters {
 		stt := st
-		s.startStarter(stt)
+		s.start(stt)
 	}
 	return s.waitUntilHealthy(starters)
 }
@@ -72,11 +70,11 @@ func (s *ServiceGroup) Start(starters []Starter) error {
 func (s *ServiceGroup) waitUntilHealthy(starters []Starter) error {
 	var w sync.WaitGroup
 	w.Add(len(starters))
-	q := collection.NewQueue[error]()
+	q := collection.NewSyncQueue[error]()
 	for _, st := range starters {
 		go func(st Starter) {
 			defer w.Done()
-			err := s.waitForHealthy(st.(HealthClientBuilder))
+			err := s.waitForHealthy(st.(HealthCheckClientBuilder))
 			if err != nil {
 				q.Queue(err)
 			}
@@ -86,23 +84,23 @@ func (s *ServiceGroup) waitUntilHealthy(starters []Starter) error {
 	return errors.Join(q.DequeueAll()...)
 }
 
-func (s *ServiceGroup) startStarter(st Starter) {
-	ch := make(chan *ErrWhileStopping)
+func (s *ServiceGroup) start(st Starter) {
+	ch := make(chan *ErrService)
 	a := &activeService{ch, st, false}
-	s.activeServices[st] = a
+	s.services[st] = a
 	go func() {
 		defer close(a.stopCh)
 		if err := a.starter.Start(); err != nil {
-			ch <- &ErrWhileStopping{Starter: a.starter, Err: err}
+			ch <- &ErrService{Starter: a.starter, Err: err}
 		}
-		a.Stopped = true
+		a.stopped = true
 	}()
 }
 
-func (s *ServiceGroup) waitForHealthy(st HealthClientBuilder) (err error) {
+func (s *ServiceGroup) waitForHealthy(st HealthCheckClientBuilder) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	cli, err := st.HealthCheckClient()
+	cli, err := st.NewHealthCheckClient()
 	if err != nil {
 		return
 	}
@@ -123,32 +121,32 @@ func (s *ServiceGroup) waitForHealthy(st HealthClientBuilder) (err error) {
 	}
 }
 
-func (s *ServiceGroup) WaitToStop() error {
-	errs := make([]error, 0)
+func (s *ServiceGroup) WaitUntilStopped() error {
+	q := collection.NewSyncQueue[error]()
 	var w sync.WaitGroup
-	w.Add(len(s.activeServices))
-	for _, svc := range s.activeServices {
+	w.Add(len(s.services))
+	for _, svc := range s.services {
 		go func(st *activeService) {
 			defer w.Done()
-			err := waitToStopService(st)
+			err := waitUntilStopped(st)
 			if err != nil {
-				errs = append(errs, err)
+				q.Queue(err)
 			}
 		}(svc)
 	}
 	w.Wait()
-	return errors.Join(errs...)
+	return errors.Join(q.DequeueAll()...)
 }
 
-func waitToStopService(svc *activeService) error {
+func waitUntilStopped(svc *activeService) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	errStop, errTimeout := WaitFor(ctx, svc.stopCh)
 	if errTimeout != nil {
-		return ErrWhileStopping{Starter: svc.starter, Err: errTimeout}
+		return ErrService{Starter: svc.starter, Err: errTimeout}
 	}
 	if errStop != nil {
-		return *errStop
+		return errStop
 	}
 	return nil
 }

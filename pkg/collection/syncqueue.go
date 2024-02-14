@@ -10,7 +10,7 @@ type SyncQueue[T any] struct {
 	mutex *sync.Mutex
 }
 
-func NewQueue[T any]() *SyncQueue[T] {
+func NewSyncQueue[T any]() *SyncQueue[T] {
 	return &SyncQueue[T]{
 		data:  make([]T, 0),
 		mutex: &sync.Mutex{},

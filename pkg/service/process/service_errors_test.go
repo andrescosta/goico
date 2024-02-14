@@ -15,7 +15,7 @@ func TestErrorProcess(t *testing.T) {
 		process.WithName("executor"),
 		process.WithAddr(localhost),
 		process.WithHealthCheckFN(getHealthCheckHandlerR()),
-		process.WithStarter(func(ctx context.Context) error {
+		process.WithStarter(func(_ context.Context) error {
 			return errors.New("process error")
 		}),
 	)
@@ -33,7 +33,7 @@ func TestErrorProcess(t *testing.T) {
 }
 
 func getHealthCheckHandlerR() func(ctx context.Context) (map[string]string, error) {
-	return func(ctx context.Context) (map[string]string, error) {
+	return func(_ context.Context) (map[string]string, error) {
 		return map[string]string{
 			"customer": "ERROR!",
 			"identity": "OK",

@@ -34,8 +34,8 @@ func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthC
 		httpsvc.WithAddr(localhost),
 		httpsvc.WithName("listener-test"),
 		httpsvc.WithStackLevelOnError[*httpsvc.ServiceOptions](stackLevel),
-		httpsvc.WithHealthCheck[*httpsvc.ServiceOptions](hfn),
-		httpsvc.WithInitRoutesFn[*httpsvc.ServiceOptions](func(ctx context.Context, r *mux.Router) error {
+		httpsvc.WithHealthCheckFn[*httpsvc.ServiceOptions](hfn),
+		httpsvc.WithInitRoutesFn[*httpsvc.ServiceOptions](func(_ context.Context, r *mux.Router) error {
 			for _, h := range handlers {
 				r.HandleFunc(h.Path, h.Handler).Schemes(h.Scheme)
 			}
@@ -76,7 +76,7 @@ func NewSidecar(ctx context.Context, hfn httpsvc.HealthCheckFn) (*Service, error
 		return nil, err
 	}
 	svc, err := httpsvc.NewSidecar(
-		httpsvc.WithHealthCheck[*httpsvc.SidecarOptions](hfn),
+		httpsvc.WithHealthCheckFn[*httpsvc.SidecarOptions](hfn),
 		httpsvc.WithPrimaryService(service),
 	)
 	if err != nil {

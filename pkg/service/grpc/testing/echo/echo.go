@@ -45,7 +45,7 @@ func NewWithServer(ctx context.Context, server EchoServer, h grpc.HealthCheckFn)
 		grpc.WithHealthCheckFn(h),
 		grpc.WithContext(ctx),
 		grpc.WithServiceDesc(&Echo_ServiceDesc),
-		grpc.WithNewServiceFn(func(ctx context.Context) (any, error) {
+		grpc.WithNewServiceFn(func(_ context.Context) (any, error) {
 			return server, nil
 		}),
 	)
@@ -100,7 +100,7 @@ func (s *Service) ClientWithTimeout(ctx context.Context, timeoutd *time.Duration
 	return NewEchoClient(conn), nil
 }
 
-func (s *Service) HealthCheckClient(ctx context.Context, name string) (*grpc.HealthCheckClient, error) {
+func (s *Service) NewHealthCheckClient(ctx context.Context, name string) (*grpc.HealthCheckClient, error) {
 	conn, err := rpc.DialContext(ctx, "",
 		rpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return s.listener.Dial()

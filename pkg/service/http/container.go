@@ -14,7 +14,7 @@ type Container struct {
 	Name string
 }
 
-func (c *Container) HealthCheckClient() (service.HealthChecker, error) {
+func (c *Container) NewHealthCheckClient() (service.HealthChecker, error) {
 	if c.Svc == nil {
 		return nil, errors.New("service not set")
 	}
