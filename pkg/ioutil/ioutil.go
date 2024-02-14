@@ -19,9 +19,9 @@ type file struct {
 	entry    os.DirEntry
 }
 
-func WriteToRandomFile(path, preffix, suffix string, data []byte) (string, error) {
+func WriteToRandomFile(path, preffix, suffix string, data []byte, perm fs.FileMode) (string, error) {
 	path = filepath.Clean(path)
-	if err := os.MkdirAll(path, os.ModeExclusive); err != nil {
+	if err := os.MkdirAll(path, perm); err != nil {
 		return "", err
 	}
 	fn, err := randomFileName(preffix, suffix)

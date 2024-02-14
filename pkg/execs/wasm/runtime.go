@@ -18,7 +18,7 @@ func NewRuntimeWithCompilationCache(tempDir string) (*Runtime, error) {
 	if tempDir == "" {
 		return nil, errors.New("directory cannot be empty")
 	}
-	if err := os.MkdirAll(tempDir, os.ModeExclusive); err != nil {
+	if err := os.MkdirAll(tempDir, 0o700); err != nil {
 		return nil, err
 	}
 	cacheDir, err := os.MkdirTemp(tempDir, "cache")
