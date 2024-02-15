@@ -6,6 +6,8 @@ import (
 	"sync"
 )
 
+var ErrTaskNotDone = errors.New("disposing a task was completed")
+
 type OnceDisposable struct {
 	done       *GValue[bool]
 	disposed   *GValue[bool]
@@ -25,7 +27,7 @@ func NewOnceDisposable() *OnceDisposable {
 
 func (o *OnceDisposable) Do(ctx context.Context, f func(ctx context.Context) error) error {
 	if o.disposed.Load() {
-		return errors.New("already disposed")
+		return errors.New("disposable object already disposed")
 	}
 	if !o.done.Load() && !o.disposed.Load() {
 		o.m.Lock()
@@ -43,7 +45,7 @@ func (o *OnceDisposable) Do(ctx context.Context, f func(ctx context.Context) err
 
 func (o *OnceDisposable) Dispose(ctx context.Context, f func(ctx context.Context) error) error {
 	if !o.done.Load() {
-		return errors.New("task not done")
+		return ErrTaskNotDone
 	}
 	if !o.disposed.Load() {
 		o.m.Lock()
