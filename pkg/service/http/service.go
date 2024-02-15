@@ -28,22 +28,20 @@ type Service struct {
 	pool            *sync.Pool
 	imsidecar       bool
 	Listener        service.HTTPListener
-}
-
-type healthStatus struct {
-	Status  string            `json:"status"`
-	Details map[string]string `json:"details"`
+	serviceStatusFn ServiceStatus
 }
 
 type (
 	initRoutesFn  = func(context.Context, *mux.Router) error
 	HealthCheckFn = func(context.Context) (map[string]string, error)
+	ServiceStatus = func() (string, time.Time)
 )
 
 type SidecarOptions struct {
-	common      *commonOptions
-	base        *service.Base
-	disableOtel bool
+	common          *commonOptions
+	base            *service.Base
+	disableOtel     bool
+	serviceStatusFn ServiceStatus
 }
 
 type httpOptions interface {
@@ -99,6 +97,8 @@ func New(opts ...Option[*ServiceOptions]) (*Service, error) {
 		return nil, err
 	}
 	svc.base = base
+	svc.serviceStatusFn = func() (string, time.Time) { return svc.base.Status() }
+
 	svc.Listener = opt.common.listener
 	// Mux Router initialization
 	router := svc.initializeRouter(opt)
@@ -128,6 +128,7 @@ func NewSidecar(opts ...Option[*SidecarOptions]) (*Service, error) {
 	svc.base = opt.base
 	svc.imsidecar = true
 	svc.Listener = opt.common.listener
+	svc.serviceStatusFn = opt.serviceStatusFn
 
 	// Mux Router initialization
 	router := svc.initializeRouterSidecar(*opt)
@@ -179,22 +180,29 @@ func (s *Service) DoServe(listener net.Listener) error {
 	return nil
 }
 
+func (s *Service) RunHealthCheck(ctx context.Context) (map[string]string, error) {
+	return s.healthCheckFunc(ctx)
+}
+
 func (s *Service) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/JSON")
-	status := &healthStatus{}
-	m, err := s.healthCheckFunc(r.Context())
+	status := &service.HealthStatus{}
+	m, err := s.RunHealthCheck(r.Context())
 	status.Details = m
-	var statusCode int
+	var httpStatusCode int
+	currStatus, when := s.serviceStatusFn()
+	status.ServiceStatus = currStatus
+	status.StartedAt = when.Format(time.UnixDate)
 	if err != nil {
-		status.Status = "error"
-		statusCode = http.StatusInternalServerError
+		status.Status = "ERROR"
+		httpStatusCode = http.StatusInternalServerError
 	} else {
-		status.Status = "alive"
-		statusCode = http.StatusOK
+		status.Status = "OK"
+		httpStatusCode = http.StatusOK
 	}
 	b := s.pool.Get().(*bytes.Buffer)
 	b.Reset()
-	WriteJSONBody(b, status, statusCode, `{error:"error getting health check status"}`, w)
+	WriteJSONBody(b, status, httpStatusCode, `{error:"error getting health check status"}`, w)
 }
 
 func (s *Service) metadataHandler(w http.ResponseWriter, _ *http.Request) {
@@ -350,6 +358,12 @@ func WithPrimaryService(svc *service.Base) Option[*SidecarOptions] {
 func WithDisableOtel(otel bool) Option[*SidecarOptions] {
 	return option.NewFuncOption(func(opts *SidecarOptions) {
 		opts.disableOtel = otel
+	})
+}
+
+func WithServiceStatusFn(f ServiceStatus) Option[*SidecarOptions] {
+	return option.NewFuncOption(func(opts *SidecarOptions) {
+		opts.serviceStatusFn = f
 	})
 }
 

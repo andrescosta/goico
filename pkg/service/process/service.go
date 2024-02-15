@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/andrescosta/goico/pkg/option"
 	"github.com/andrescosta/goico/pkg/service"
@@ -65,6 +66,7 @@ func New(opts ...Option) (*Service, error) {
 		http.WithPrimaryService(svc.Base),
 		http.WithHealthCheckFn[*http.SidecarOptions](opt.healthCheckFN),
 		http.WithListener[*http.SidecarOptions](opt.listener),
+		http.WithServiceStatusFn(func() (string, time.Time) { return svc.Base.Status() }),
 		http.WithInitRoutesFn[*http.SidecarOptions](func(_ context.Context, router *mux.Router) error {
 			if opt.profilingEnabled {
 				service.AttachProfilingHandlers(router)
@@ -80,24 +82,35 @@ func New(opts ...Option) (*Service, error) {
 }
 
 func (s Service) Serve() error {
+	return s.ServeWithDelay(0)
+}
+
+func (s Service) ServeWithDelay(delay time.Duration) error {
 	listener, err := s.sidecarService.Listener.Listen(s.Base.Addr)
 	if err != nil {
 		return err
 	}
-	return s.DoServe(listener)
+	return s.DoServeWithDelay(listener, delay)
 }
 
 func (s Service) DoServe(listener net.Listener) error {
+	return s.DoServeWithDelay(listener, 0)
+}
+
+func (s Service) DoServeWithDelay(listener net.Listener, delay time.Duration) error {
 	logger := zerolog.Ctx(s.Base.Ctx)
 	logger.Info().Msgf("Starting helper service %d ", os.Getpid())
 	var w sync.WaitGroup
 	w.Add(2)
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
-	s.Base.SetStartedNow()
 	var err error
 	go func() {
 		defer w.Done()
-		err = s.start(s.Base.Ctx)
+		sleep(s.Base.Ctx, delay)
+		if s.Base.Ctx.Err() == nil {
+			s.Base.SetStartedNow()
+			err = s.start(s.Base.Ctx)
+		}
 		s.Base.Stop()
 	}()
 	go func() {
@@ -158,4 +171,18 @@ func WithProfilingEnabled(p bool) Option {
 	return option.NewFuncOption(func(s *Options) {
 		s.profilingEnabled = p
 	})
+}
+
+func sleep(ctx context.Context, d time.Duration) {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		if !timer.Stop() {
+			<-timer.C
+		}
+		return
+	case <-timer.C:
+		return
+	}
 }

@@ -27,10 +27,9 @@ type (
 		HasErrors bool              `json:"-"`
 	}
 	metadata struct {
-		Addr      string
-		Kind      string
-		Name      string
-		StartTime string
+		Addr string
+		Kind string
+		Name string
 	}
 	scenario interface {
 		sname() string
@@ -202,7 +201,7 @@ func TestHTTP(t *testing.T) {
 					"database": "OK",
 				},
 				HasErrors: false,
-				Status:    "alive",
+				Status:    "OK",
 			},
 		},
 		healthCheck{
@@ -216,7 +215,7 @@ func TestHTTP(t *testing.T) {
 					"database": "ERROR!",
 				},
 				HasErrors: true,
-				Status:    "error",
+				Status:    "ERROR",
 			},
 		},
 		healthCheck{
@@ -230,7 +229,7 @@ func TestHTTP(t *testing.T) {
 					"workers_stopped": "0",
 				},
 				HasErrors: false,
-				Status:    "alive",
+				Status:    "OK",
 			},
 		},
 		healthCheck{
@@ -244,7 +243,7 @@ func TestHTTP(t *testing.T) {
 					"workers_stopped": "5",
 				},
 				HasErrors: true,
-				Status:    "error",
+				Status:    "ERROR",
 			},
 		},
 	},
@@ -335,10 +334,6 @@ func (s getMetadata) exec(t *testing.T, svc *httptest.Service) {
 	}
 	if m.Name == "" {
 		t.Errorf("expected Name got <empty>")
-		return
-	}
-	if m.StartTime == "" {
-		t.Errorf("expected StartTime got <empty>")
 		return
 	}
 }

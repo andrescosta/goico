@@ -241,10 +241,6 @@ func (s getMetadata) exec(ctx context.Context, t *testing.T, svc *echo.Service, 
 	if svc.Addr() != "" && info["Addr"] != svc.Addr() {
 		t.Errorf("expected %s got %s", svc.Addr(), info["Addr"])
 	}
-	_, ok := info["StartTime"]
-	if !ok {
-		t.Error("expected StartTime go <nil>")
-	}
 }
 
 func (s upsTimeout) exec(ctx context.Context, t *testing.T, _ *echo.Service, c echo.EchoClient) {
