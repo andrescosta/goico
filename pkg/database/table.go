@@ -60,7 +60,7 @@ func (s *Table[S]) Delete(id string) error {
 
 func (s *Table[S]) Get(id string) (*S, error) {
 	k := s.getKey(id)
-	d, iter, err := s.db.db.Get(k.encode())
+	value, closer, err := s.db.db.Get(k.encode())
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {
 			return nil, nil
@@ -68,11 +68,11 @@ func (s *Table[S]) Get(id string) (*S, error) {
 		return nil, err
 	}
 	errs := make([]error, 0)
-	e, err := s.marshaler.Unmarshal(d)
+	e, err := s.marshaler.Unmarshal(value)
 	if err != nil {
 		errs = append(errs, err)
 	}
-	if err := iter.Close(); err != nil {
+	if err := closer.Close(); err != nil {
 		errs = append(errs, err)
 	}
 	if len(errs) > 0 {
