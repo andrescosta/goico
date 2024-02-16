@@ -50,9 +50,5 @@ func Open(ctx context.Context, path string, ops Option) (*Database, error) {
 }
 
 func (s *Database) Close(ctx context.Context) error {
-	if err := s.db.Close(); err != nil {
-		return err
-	}
-	zerolog.Ctx(ctx).Debug().Msg("DB CLOSED!!")
-	return nil
+	return s.db.Close()
 }
