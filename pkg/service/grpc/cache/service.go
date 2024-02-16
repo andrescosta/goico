@@ -130,7 +130,7 @@ func (c *Client) ListenerForEvents(ctx context.Context) (*broadcaster.Listener[*
 }
 
 func (c *Client) startListenerForEvents(ctx context.Context) error {
-	cb := broadcaster.Start[*event.Event](ctx)
+	cb := broadcaster.NewAndStart[*event.Event](ctx)
 	c.broadcasterEvent = cb
 	s, err := c.client.Events(ctx, &event.Empty{})
 	if err != nil {

@@ -11,16 +11,18 @@ type OnceDisposable struct {
 	disposed   *GValue[bool]
 	errDone    *GValue[error]
 	errDispose *GValue[error]
-	m          sync.Mutex
+	m          *sync.Mutex
 }
 
 func NewOnceDisposable() *OnceDisposable {
-	return &OnceDisposable{
+	o := &OnceDisposable{
 		done:       NewGValue(false),
 		disposed:   NewGValue(false),
 		errDone:    &GValue[error]{},
 		errDispose: &GValue[error]{},
+		m:          &sync.Mutex{},
 	}
+	return o
 }
 
 func (o *OnceDisposable) Do(ctx context.Context, f func(ctx context.Context) error) error {

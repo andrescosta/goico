@@ -49,6 +49,6 @@ func Open(ctx context.Context, path string, ops Option) (*Database, error) {
 	}, nil
 }
 
-func (s *Database) Close(ctx context.Context) error {
+func (s *Database) Close() error {
 	return s.db.Close()
 }

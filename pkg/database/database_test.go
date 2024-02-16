@@ -101,7 +101,7 @@ func TestOperations(t *testing.T) {
 		db, err := Open(context.Background(), filepath.Join(t.TempDir(), "database"), o)
 		test.Nil(t, err)
 		defer func() {
-			err := db.Close(context.Background())
+			err := db.Close()
 			test.Nil(t, err)
 		}()
 
@@ -127,7 +127,7 @@ func TestMarshallerError(t *testing.T) {
 	db, err := Open(context.Background(), dbName, Option{})
 	test.Nil(t, err)
 	defer func() {
-		err := db.Close(context.Background())
+		err := db.Close()
 		test.Nil(t, err)
 	}()
 

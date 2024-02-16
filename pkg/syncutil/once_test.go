@@ -183,15 +183,15 @@ func TestBothErrors(t *testing.T) {
 	wDisponse.Wait()
 }
 
-func TestErrorCallDispose(t *testing.T) {
+func TestCallDisposeNotDoCall(t *testing.T) {
 	r := syncutil.NewOnceDisposable()
 	v := 0
 	err := r.Dispose(context.Background(), func(_ context.Context) error {
 		v++
 		return nil
 	})
-	test.NotNil(t, err)
-	test.Equals(t, v, 0)
+	test.Nil(t, err)
+	test.Equals(t, v, 1)
 }
 
 func TestErrorCallDo(t *testing.T) {

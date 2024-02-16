@@ -24,11 +24,11 @@ func (b *statusBarrier) Out() {
 	b.mutex.RUnlock()
 }
 
-func (b *statusBarrier) EnteringStoppingArea() {
+func (b *statusBarrier) EnteringStatusArea() {
 	b.mutex.Lock()
 }
 
-func (b *statusBarrier) OutOfStoppingArea() {
+func (b *statusBarrier) OutOfStatusArea() {
 	b.mutex.Unlock()
 }
 

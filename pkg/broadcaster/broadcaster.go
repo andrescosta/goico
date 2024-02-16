@@ -12,7 +12,7 @@ var ErrStopped = errors.New("broadcaster is stopped")
 type void struct{}
 
 type Broadcaster[T any] struct {
-	listeners     sync.Map
+	listeners     *sync.Map
 	c             chan T
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -26,22 +26,33 @@ type Listener[T any] struct {
 	statusBarrier *statusBarrier
 }
 
-func Start[T any](ctx context.Context) *Broadcaster[T] {
+func New[T any](ctx context.Context) *Broadcaster[T] {
 	ctx1, cancel := context.WithCancel(ctx)
-	broadcaster := &Broadcaster[T]{
-		listeners:     sync.Map{},
+	return &Broadcaster[T]{
+		listeners:     &sync.Map{},
 		c:             make(chan T, 1),
 		ctx:           ctx1,
 		cancel:        cancel,
 		worker:        &sync.WaitGroup{},
 		statusBarrier: newStatusBarrier(),
 	}
-	broadcaster.statusBarrier.MarkStarted()
-	broadcaster.worker.Add(1)
-	go func(b *Broadcaster[T]) {
-		defer func() {
-			b.worker.Done()
-		}()
+}
+
+func NewAndStart[T any](ctx context.Context) *Broadcaster[T] {
+	broadcaster := New[T](ctx)
+	broadcaster.Start()
+	return broadcaster
+}
+
+func (b *Broadcaster[T]) Start() {
+	b.statusBarrier.EnteringStatusArea()
+	defer b.statusBarrier.OutOfStatusArea()
+	if !b.statusBarrier.IsStopped() {
+		return
+	}
+	b.worker.Add(1)
+	go func() {
+		defer b.worker.Done()
 		for {
 			select {
 			case <-b.ctx.Done():
@@ -58,13 +69,13 @@ func Start[T any](ctx context.Context) *Broadcaster[T] {
 				})
 			}
 		}
-	}(broadcaster)
-	return broadcaster
+	}()
+	b.statusBarrier.MarkStarted()
 }
 
 func (b *Broadcaster[T]) Stop() error {
-	b.statusBarrier.EnteringStoppingArea()
-	defer b.statusBarrier.OutOfStoppingArea()
+	b.statusBarrier.EnteringStatusArea()
+	defer b.statusBarrier.OutOfStatusArea()
 	if b.statusBarrier.IsStopped() {
 		return ErrStopped
 	}
@@ -128,6 +139,7 @@ func (b *Broadcaster[T]) IsSubscribed(l *Listener[T]) (bool, error) {
 func (b *Broadcaster[T]) Write(t T) error {
 	b.statusBarrier.Entering()
 	if b.statusBarrier.IsStopped() {
+		b.statusBarrier.Out()
 		return ErrStopped
 	}
 	go func() {
@@ -156,8 +168,8 @@ func (b *Broadcaster[T]) WriteSync(t T) error {
 }
 
 func (b *Listener[T]) stop() error {
-	b.statusBarrier.EnteringStoppingArea()
-	defer b.statusBarrier.OutOfStoppingArea()
+	b.statusBarrier.EnteringStatusArea()
+	defer b.statusBarrier.OutOfStatusArea()
 	if b.statusBarrier.IsStopped() {
 		return ErrStopped
 	}
