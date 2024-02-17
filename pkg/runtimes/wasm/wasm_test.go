@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andrescosta/goico/pkg/execs/wasm"
+	"github.com/andrescosta/goico/pkg/runtimes/wasm"
 	"github.com/andrescosta/goico/pkg/test"
 )
 
