@@ -182,7 +182,7 @@ func TestGRPC(t *testing.T) {
 				name:           "healthcheck",
 				healthCheckFnn: func(context.Context) error { return nil },
 				grpcserver:     serverEcho,
-				envv:           []string{fmt.Sprintf("grpc.healthcheck=%s", 1*time.Microsecond)},
+				envv:           []string{fmt.Sprintf("grpc.healthcheck.freq=%s", 1*time.Microsecond)},
 			},
 		},
 		healthCheck{
@@ -198,7 +198,7 @@ func TestGRPC(t *testing.T) {
 					return errors.New("db error")
 				},
 				grpcserver: serverEcho,
-				envv:       []string{fmt.Sprintf("grpc.healthcheck=%s", 1*time.Microsecond)},
+				envv:       []string{fmt.Sprintf("grpc.healthcheck.freq=%s", 1*time.Microsecond)},
 			},
 		},
 		healthCheck{
@@ -207,7 +207,7 @@ func TestGRPC(t *testing.T) {
 				name:           "healthcheckerror",
 				healthCheckFnn: func(context.Context) error { return errors.New("db error") },
 				grpcserver:     serverEcho,
-				envv:           []string{fmt.Sprintf("grpc.healthcheck=%s", 1*time.Microsecond)},
+				envv:           []string{fmt.Sprintf("grpc.healthcheck.freq=%s", 1*time.Microsecond)},
 			},
 		},
 	})
