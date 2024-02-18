@@ -11,21 +11,23 @@ type OnceDisposable struct {
 	disposed   *GValue[bool]
 	errDone    *GValue[error]
 	errDispose *GValue[error]
-	m          sync.Mutex
+	m          *sync.Mutex
 }
 
 func NewOnceDisposable() *OnceDisposable {
-	return &OnceDisposable{
+	o := &OnceDisposable{
 		done:       NewGValue(false),
 		disposed:   NewGValue(false),
 		errDone:    &GValue[error]{},
 		errDispose: &GValue[error]{},
+		m:          &sync.Mutex{},
 	}
+	return o
 }
 
 func (o *OnceDisposable) Do(ctx context.Context, f func(ctx context.Context) error) error {
 	if o.disposed.Load() {
-		return errors.New("already disposed")
+		return errors.New("disposable object already disposed")
 	}
 	if !o.done.Load() && !o.disposed.Load() {
 		o.m.Lock()
@@ -42,14 +44,11 @@ func (o *OnceDisposable) Do(ctx context.Context, f func(ctx context.Context) err
 }
 
 func (o *OnceDisposable) Dispose(ctx context.Context, f func(ctx context.Context) error) error {
-	if !o.done.Load() {
-		return errors.New("task not done")
-	}
-	if !o.disposed.Load() {
+	if !o.wasDisposed() {
 		o.m.Lock()
 		defer o.m.Unlock()
-		if o.done.Load() && !o.disposed.Load() {
-			defer o.disposed.Store(true)
+		if !o.wasDisposed() {
+			defer o.setDisposed()
 			err := f(ctx)
 			if err != nil {
 				o.errDispose.Store(err)
@@ -57,4 +56,12 @@ func (o *OnceDisposable) Dispose(ctx context.Context, f func(ctx context.Context
 		}
 	}
 	return o.errDispose.Load()
+}
+
+func (o *OnceDisposable) wasDisposed() bool {
+	return o.disposed.Load()
+}
+
+func (o *OnceDisposable) setDisposed() {
+	o.disposed.Store(true)
 }

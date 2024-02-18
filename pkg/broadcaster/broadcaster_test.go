@@ -25,7 +25,68 @@ func TestBroadcasters(t *testing.T) {
 		name: "Customer 1",
 		id:   1,
 	}
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
+	maxListeners := 100
+	var waitListeners sync.WaitGroup
+	waiter := make(chan struct{})
+	for i := 0; i < maxListeners; i++ {
+		waitListeners.Add(1)
+		listener, err := b.Subscribe()
+		test.Nil(t, err)
+		go func() {
+			defer waitListeners.Done()
+			<-waiter
+			timer := time.NewTimer(5 * time.Second)
+			select {
+			case d := <-listener.C:
+				if d.name != newdata.name {
+					t.Errorf("	 %s got %s", newdata.name, d.name)
+				}
+				if d.id != newdata.id {
+					t.Errorf("id expected %d got %d", newdata.id, d.id)
+				}
+			case <-timer.C:
+				t.Error("timeout")
+			}
+		}()
+	}
+	close(waiter)
+	err := b.WriteSync(newdata)
+	test.Nil(t, err)
+	waitListeners.Wait()
+	err = b.Stop()
+	test.Nil(t, err)
+}
+
+func TestBroadcastersNotStarted(t *testing.T) {
+	newdata := data{
+		name: "Customer 1",
+		id:   1,
+	}
+	b := New[data](context.Background())
+	var waitListeners sync.WaitGroup
+	waitListeners.Add(1)
+	go func() {
+		defer waitListeners.Done()
+		err := b.WriteSync(newdata)
+		test.NotNil(t, err)
+		err = b.Write(newdata)
+		test.NotNil(t, err)
+		_, err = b.Subscribe()
+		test.NotNil(t, err)
+	}()
+	waitListeners.Wait()
+	err := b.Stop()
+	test.NotNil(t, err)
+}
+
+func TestBroadcastersWriteClosed(t *testing.T) {
+	newdata := data{
+		name: "Customer 1",
+		id:   1,
+	}
+	b := New[data](context.Background())
+	b.Start()
 	maxListeners := 100
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
@@ -63,7 +124,7 @@ func TestUnsubscribe(t *testing.T) {
 		name: "Customer 1",
 		id:   1,
 	}
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	var waitListeners sync.WaitGroup
 	maxListeners := 200
 	waiter := make(chan struct{})
@@ -121,7 +182,7 @@ func TestStopWrite(t *testing.T) {
 		name: "Customer 1",
 		id:   1,
 	}
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	var waitListeners sync.WaitGroup
 	maxListeners := 10
 	waiter := make(chan struct{})
@@ -166,7 +227,7 @@ func TestStopWriteSync(t *testing.T) {
 		id:   1,
 	}
 	maxListeners := 100
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	for i := 0; i < maxListeners; i++ {
@@ -212,7 +273,7 @@ func TestStoppedError(t *testing.T) {
 		name: "Customer 1",
 		id:   1,
 	}
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	l, err := b.Subscribe()
 	test.Nil(t, err)
 	err = b.Stop()
@@ -232,7 +293,7 @@ func TestStoppedError(t *testing.T) {
 }
 
 func TestUnsubscribeUnsubscribe(t *testing.T) {
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	l, err := b.Subscribe()
 	test.Nil(t, err)
 	err = b.Unsubscribe(l)
@@ -244,7 +305,7 @@ func TestUnsubscribeUnsubscribe(t *testing.T) {
 }
 
 func TestMultiWriters(t *testing.T) {
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 200
@@ -307,7 +368,7 @@ func TestMultiWriters(t *testing.T) {
 }
 
 func TestMultiWritersSync(t *testing.T) {
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 20
@@ -370,7 +431,7 @@ func TestMultiWritersSync(t *testing.T) {
 }
 
 func TestMultiWritersSyncStop(t *testing.T) {
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 20
@@ -438,7 +499,7 @@ func TestMultiWritersSyncStop(t *testing.T) {
 }
 
 func TestMultiWritersStop(t *testing.T) {
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 20
@@ -506,7 +567,7 @@ func TestMultiWritersStop(t *testing.T) {
 }
 
 func TestMultiWritersUnsubscribe(t *testing.T) {
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	var waitListeners sync.WaitGroup
 	waiter := make(chan struct{})
 	maxProducers := 200
@@ -582,7 +643,7 @@ func TestMultiWritersUnsubscribe(t *testing.T) {
 }
 
 func TestMultiWritersMultiStop(t *testing.T) {
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	var w sync.WaitGroup
 	waiter := make(chan struct{})
 	maxListeners := 100
@@ -650,7 +711,7 @@ func TestWithTimeoutContext(t *testing.T) {
 		id:   1,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	b := Start[data](context.Background())
+	b := NewAndStart[data](context.Background())
 	var w sync.WaitGroup
 	waiter := make(chan struct{})
 	for i := 0; i < 1000; i++ {

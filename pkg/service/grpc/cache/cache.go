@@ -18,7 +18,7 @@ type Cache[K comparable, V any] struct {
 func New[K comparable, V any](ctx context.Context, name string, publish bool) *Cache[K, V] {
 	var b *broadcaster.Broadcaster[*event.Event]
 	if publish {
-		b = broadcaster.Start[*event.Event](ctx)
+		b = broadcaster.NewAndStart[*event.Event](ctx)
 	}
 	return &Cache[K, V]{
 		name:        name,

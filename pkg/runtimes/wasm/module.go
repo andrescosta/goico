@@ -92,7 +92,7 @@ func (f *Module) free(ctx context.Context, offset, size uint64) ([]uint64, error
 	return call(ctx, f.freeFunc, offset, size)
 }
 
-func (f *Module) Execute(ctx context.Context, id uint32, data string) (uint64, string, error) {
+func (f *Module) Run(ctx context.Context, id uint32, data string) (uint64, string, error) {
 	logger := zerolog.Ctx(ctx)
 	// reserve memory for the string parameter
 	strParamOffset, strParamSize, err := f.writeToMemory(ctx, data)

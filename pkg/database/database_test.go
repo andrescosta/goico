@@ -2,6 +2,7 @@ package database_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -80,7 +81,7 @@ var (
 
 func TestPathError(t *testing.T) {
 	t.Parallel()
-	_, err := Open("", Option{})
+	_, err := Open(context.Background(), "", Option{})
 	test.NotNil(t, err)
 }
 
@@ -97,7 +98,7 @@ func TestOperations(t *testing.T) {
 	}
 	ops := []Option{{}, {InMemory: true}}
 	for _, o := range ops {
-		db, err := Open(filepath.Join(t.TempDir(), "database"), o)
+		db, err := Open(context.Background(), filepath.Join(t.TempDir(), "database"), o)
 		test.Nil(t, err)
 		defer func() {
 			err := db.Close()
@@ -123,7 +124,7 @@ func TestMarshallerError(t *testing.T) {
 	scenariosData := newscenario("data", fillrandomdata, add)
 
 	dbName := filepath.Join(t.TempDir(), "database-m-error.md")
-	db, err := Open(dbName, Option{})
+	db, err := Open(context.Background(), dbName, Option{})
 	test.Nil(t, err)
 	defer func() {
 		err := db.Close()

@@ -78,6 +78,7 @@ func NewSidecar(ctx context.Context, hfn httpsvc.HealthCheckFn) (*Service, error
 	svc, err := httpsvc.NewSidecar(
 		httpsvc.WithHealthCheckFn[*httpsvc.SidecarOptions](hfn),
 		httpsvc.WithPrimaryService(service),
+		httpsvc.WithServiceStatusFn(func() (string, time.Time) { return service.Status() }),
 	)
 	if err != nil {
 		return nil, err

@@ -214,7 +214,7 @@ func (g *Service) Metadata() map[string]string {
 func (g *Service) healthcheckIt(ctx context.Context) {
 	current := g.checkAndSetServingStatus(ctx, healthpb.HealthCheckResponse_UNKNOWN)
 	for {
-		timer := time.NewTicker(*env.Duration("grpc.healthcheck", 5*time.Second))
+		timer := time.NewTicker(*env.Duration("grpc.healthcheck.freq", 5*time.Second))
 		defer timer.Stop()
 		select {
 		case <-ctx.Done():
