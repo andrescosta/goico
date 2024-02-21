@@ -15,7 +15,7 @@ import (
 
 type (
 	ModuleType uint32
-	LogFn      func(context.Context, uint32, uint32, string) error
+	LogFn      func(context.Context, uint32, string) error
 )
 
 type Module struct {
@@ -92,9 +92,9 @@ func (f *Module) free(ctx context.Context, offset, size uint64) ([]uint64, error
 	return call(ctx, f.freeFunc, offset, size)
 }
 
-func (f *Module) Run(ctx context.Context, id uint32, data string) (uint64, string, error) {
+func (f *Module) Run(ctx context.Context, data string) (uint64, string, error) {
 	logger := zerolog.Ctx(ctx)
-	// reserve memory for the string parameter
+	// write to internal memory
 	strParamOffset, strParamSize, err := f.writeToMemory(ctx, data)
 	if err != nil {
 		return 0, "", err
@@ -117,7 +117,7 @@ func (f *Module) Run(ctx context.Context, id uint32, data string) (uint64, strin
 	}()
 	logger.Debug().Msg("calling main method")
 	// The result of the call will be stored in struct pointed by resultFuncPtr
-	_, err = call(ctx, f.mainFunc, resultFuncPtr, api.EncodeU32(id), strParamOffset, strParamSize)
+	_, err = call(ctx, f.mainFunc, resultFuncPtr, strParamOffset, strParamSize)
 	if err != nil {
 		return 0, "", err
 	}
@@ -189,7 +189,7 @@ func (f *Module) getResultStr(ctx context.Context, encodedPtr uint64) (string, e
 	return string(bytes), nil
 }
 
-func (f *Module) log(ctx context.Context, m api.Module, id, level, offset, byteCount uint32) {
+func (f *Module) log(ctx context.Context, m api.Module, level, offset, byteCount uint32) {
 	logger := zerolog.Ctx(ctx)
 	buf, ok := m.Memory().Read(offset, byteCount)
 	if !ok {
@@ -198,7 +198,7 @@ func (f *Module) log(ctx context.Context, m api.Module, id, level, offset, byteC
 	msg := string(buf)
 	logger.WithLevel(zerolog.Level(level)).Msg(msg)
 	if f.logFn != nil {
-		if err := f.logFn(ctx, id, level, msg); err != nil {
+		if err := f.logFn(ctx, level, msg); err != nil {
 			logger.Err(err).Msg("error executing log function.")
 		}
 	}

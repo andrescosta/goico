@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"errors"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +18,9 @@ var logw []byte
 //go:embed testdata/echo.wasm
 var echo []byte
 
+//go:embed testdata/error.wasm
+var doerror []byte
+
 //go:embed testdata/panic.wasm
 var panicw []byte
 
@@ -31,7 +33,7 @@ var sleeper []byte
 type (
 	scenario interface {
 		name() string
-		input() (uint32, string)
+		input() string
 		wasm() []byte
 		logFn() wasm.LogFn
 		validate(*testing.T, uint64, string)
@@ -71,7 +73,6 @@ type (
 	logvalue struct {
 		message string
 		lvl     uint32
-		id      uint32
 	}
 )
 
@@ -82,7 +83,7 @@ func Test(t *testing.T) {
 			inputdata: inputdata{"test_ok", 0},
 		},
 		&scenarioresult{
-			config:    config{"test_error", echo},
+			config:    config{"test_error", doerror},
 			inputdata: inputdata{"test_error", 500},
 		},
 		&scenariowitherror{
@@ -95,7 +96,7 @@ func Test(t *testing.T) {
 		},
 		&scenariolog{
 			config:    config{"log", logw},
-			inputdata: inputdata{"log_ok_", 10},
+			inputdata: inputdata{"log_ok_", 0},
 			logsexpected: []logvalue{
 				{message: "_nolevel", lvl: 6},
 				{message: "_info", lvl: 1},
@@ -109,7 +110,7 @@ func Test(t *testing.T) {
 		},
 		&scenariolog{
 			config:       config{"log_nook", logw},
-			inputdata:    inputdata{"log_ok_", 10},
+			inputdata:    inputdata{"log_ok_", 0},
 			logsexpected: nil,
 		},
 	}
@@ -122,23 +123,22 @@ func Test(t *testing.T) {
 	}()
 	for _, s := range scenarios {
 		t.Run(s.name(), func(t *testing.T) {
-			t.Setenv("wasm.timeout", (2 * time.Second).String())
 			m, err := wasm.NewModule(ctx, runtime, s.wasm(), "event", s.logFn())
 			test.Nil(t, err)
 			t.Cleanup(func() {
 				m.Close(ctx)
 			})
-			id, msg := s.input()
+			msg := s.input()
 			ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 			defer cancel()
-			code, str, err := m.Run(ctx, id, msg)
+			code, str, err := m.Run(ctx, msg)
 			s.validateError(t, err)
 			s.validate(t, code, str)
 		})
 	}
 }
 
-func TestParalel(t *testing.T) {
+func TestUsingGoroutines(t *testing.T) {
 	dir := t.TempDir()
 	ctx := context.Background()
 	runtime, err := wasm.NewRuntimeWithCompilationCache(dir)
@@ -157,7 +157,7 @@ func TestParalel(t *testing.T) {
 			inputdata: inputdata{"test_ok", 0},
 		},
 		&scenarioresult{
-			config:    config{"test_error", echo},
+			config:    config{"test_error", doerror},
 			inputdata: inputdata{"test_error", 500},
 		},
 		&scenariowitherror{
@@ -194,20 +194,18 @@ func TestParalel(t *testing.T) {
 		wgready.Add(1)
 		go func(s scenario) {
 			defer wg.Done()
-			t.Run(s.name()+"_parallel", func(t *testing.T) {
-				_, ok := os.LookupEnv("wasm.timeout")
-				print(ok)
+			t.Run(s.name()+"_goroutine", func(t *testing.T) {
 				m, err := wasm.NewModule(ctx, runtime, s.wasm(), "event", s.logFn())
 				test.Nil(t, err)
 				t.Cleanup(func() {
 					err := m.Close(ctx)
 					test.Nil(t, err)
 				})
-				id, msg := s.input()
+				msg := s.input()
 				wgready.Done()
 				wgready.Wait()
 				ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-				code, str, err := m.Run(ctx, id, msg)
+				code, str, err := m.Run(ctx, msg)
 				cancel()
 				s.validateError(t, err)
 				s.validate(t, code, str)
@@ -217,11 +215,11 @@ func TestParalel(t *testing.T) {
 	wg.Wait()
 }
 
-func (s *scenariolog) log(_ context.Context, id, lvl uint32, message string) error {
+func (s *scenariolog) log(_ context.Context, lvl uint32, message string) error {
 	if s.logsexpected == nil {
 		return errors.New("error")
 	}
-	s.logs[message] = logvalue{message, lvl, id}
+	s.logs[message] = logvalue{message, lvl}
 	return nil
 }
 
@@ -241,9 +239,6 @@ func (s *scenariolog) validate(t *testing.T, code uint64, message string) {
 		}
 		if message != "ok" {
 			t.Errorf("expected ok got %s", message)
-		}
-		if s.code != le.id {
-			t.Errorf("expected %d got %d", l.id, le.id)
 		}
 		if le.lvl != l.lvl {
 			t.Errorf("expected %d got %d", l.lvl, le.lvl)
@@ -275,8 +270,8 @@ func (*scenarioresult) validateError(t *testing.T, err error) {
 	test.Nil(t, err)
 }
 
-func (i *inputdata) input() (uint32, string) {
-	return i.code, i.message
+func (i *inputdata) input() string {
+	return i.message
 }
 
 func (s *scenariolog) logFn() wasm.LogFn {
@@ -295,6 +290,6 @@ func (*defaultlog) logFn() wasm.LogFn {
 	return log
 }
 
-func log(context.Context, uint32, uint32, string) error {
+func log(context.Context, uint32, string) error {
 	return nil
 }
