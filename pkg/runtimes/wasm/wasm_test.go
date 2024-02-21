@@ -27,6 +27,9 @@ var panicw []byte
 //go:embed testdata/sleeper.wasm
 var sleeper []byte
 
+//go:embed testdata/greetrust.wasm
+var greetrust []byte
+
 // Test sunny case: input-output
 // Test return error
 // Test log
@@ -81,6 +84,10 @@ func Test(t *testing.T) {
 		&scenarioresult{
 			config:    config{"test_ok", echo},
 			inputdata: inputdata{"test_ok", 0},
+		},
+		&scenarioresult{
+			config:    config{"Hello, from a rusty script!", greetrust},
+			inputdata: inputdata{"Hello, from a rusty script!", 0},
 		},
 		&scenarioresult{
 			config:    config{"test_error", doerror},
@@ -155,6 +162,10 @@ func TestUsingGoroutines(t *testing.T) {
 		&scenarioresult{
 			config:    config{"test_ok", echo},
 			inputdata: inputdata{"test_ok", 0},
+		},
+		&scenarioresult{
+			config:    config{"Hello, from a rusty script!", greetrust},
+			inputdata: inputdata{"Hello, from a rusty script!", 0},
 		},
 		&scenarioresult{
 			config:    config{"test_error", doerror},
