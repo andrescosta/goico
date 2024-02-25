@@ -11,14 +11,17 @@ import (
 )
 
 const (
-	EnviromentVar = "APP_ENV"
-	Development   = "development"
-	Production    = "production"
-	Test          = "test"
-	WorkDirVar    = "workdir"
-	BaseDirVar    = "basedir"
-	fileDefault   = ".env"
+	VarEnviroment = "APP_ENV"
+	VarWorkDir    = "workdir"
+	VarBaseDir    = "basedir"
 )
+
+const (
+	Development = "development"
+	Production  = "production"
+	Test        = "test"
+)
+const fileDefault = ".env"
 
 var environments = []string{Development, Production, Test}
 
@@ -32,7 +35,7 @@ func Load(name string) (bool, string, error) {
 	if err := setEnvsUsingCommandLineArgs(); err != nil {
 		return false, "", err
 	}
-	environment := os.Getenv(EnviromentVar)
+	environment := os.Getenv(VarEnviroment)
 	if strings.TrimSpace(environment) == "" {
 		environment = Development
 	} else {
@@ -68,16 +71,6 @@ func Load(name string) (bool, string, error) {
 	}
 
 	return loaded, environment, nil
-}
-
-func SetargsV(name string, value string) {
-	os.Args = append(os.Args, fmt.Sprintf("--env:%s=%s", name, value))
-}
-
-func Setargs(args ...string) {
-	for _, arg := range args {
-		os.Args = append(os.Args, fmt.Sprintf("--env:%s", arg))
-	}
 }
 
 func load(override bool, files ...string) (err error) {

@@ -11,12 +11,12 @@ import (
 
 func Workdir() string {
 	defaultDir := fmt.Sprint(".", string(os.PathSeparator))
-	return String(WorkDirVar, defaultDir)
+	return String(VarWorkDir, defaultDir)
 }
 
 func Basedir() string {
 	defaultDir := fmt.Sprint(".", string(os.PathSeparator))
-	return String(BaseDirVar, defaultDir)
+	return String(VarBaseDir, defaultDir)
 }
 
 func WorkdirPlus(elem ...string) (ret string) {

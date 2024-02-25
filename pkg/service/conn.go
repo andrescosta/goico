@@ -148,12 +148,12 @@ func (t *BufConn) Tranport(addr string) (*http.Transport, error) {
 func (t *BufConn) listenerFor(addr string) *bufconn.Listener {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	l, ok := t.listeners[addr]
+	listener, ok := t.listeners[addr]
 	if !ok {
-		l = bufconn.Listen(1000)
-		t.listeners[addr] = l
+		listener = bufconn.Listen(1000)
+		t.listeners[addr] = listener
 	}
-	return l
+	return listener
 }
 
 func (t *BufConn) CloseAll() {
