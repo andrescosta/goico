@@ -312,9 +312,9 @@ func run(t *testing.T, ss []scenario) {
 	for _, s := range ss {
 		t.Run(s.sname(), func(t *testing.T) {
 			errch := make(chan error)
-			b := env.Backup()
+			b := test.DoBackupEnv()
 			t.Cleanup(func() {
-				env.Restore(b)
+				test.RestoreEnv(b)
 			})
 			setEnv(s.env())
 			_, _, err := env.Load("echo")
@@ -357,10 +357,10 @@ func (c config) timeout() *time.Duration           { return c.timeoutv }
 
 func setEnv(e []string) {
 	if e != nil {
-		env.Setargs(e...)
+		test.Setargs(e...)
 		return
 	}
-	env.Setargs("metadata.enabled=true")
+	test.Setargs("metadata.enabled=true")
 	httptest.SetHTTPServerTimeouts(1 * time.Second)
 }
 

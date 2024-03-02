@@ -184,9 +184,9 @@ func run(t *testing.T, ss []scenario) {
 	for _, s := range ss {
 		t.Run(s.sname(), func(t *testing.T) {
 			localhost := "127.0.0.1:0"
-			b := env.Backup()
+			b := test.DoBackupEnv()
 			t.Cleanup(func() {
-				env.Restore(b)
+				test.RestoreEnv(b)
 			})
 			setEnv(s.env())
 			_, _, err := env.Load("echo")
@@ -246,10 +246,10 @@ func (c config) env() []string { return c.envv }
 
 func setEnv(e []string) {
 	if e != nil {
-		env.Setargs(e...)
+		test.Setargs(e...)
 		return
 	}
-	env.Setargs("metadata.enabled.sidecar=true")
+	test.Setargs("metadata.enabled.sidecar=true")
 	httptest.SetHTTPServerTimeouts(1 * time.Second)
 }
 

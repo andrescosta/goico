@@ -200,9 +200,9 @@ func (s *Service) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 		status.Status = "OK"
 		httpStatusCode = http.StatusOK
 	}
-	b := s.pool.Get().(*bytes.Buffer)
-	b.Reset()
-	WriteJSONBody(b, status, httpStatusCode, `{error:"error getting health check status"}`, w)
+	buff := s.pool.Get().(*bytes.Buffer)
+	buff.Reset()
+	WriteJSONBody(buff, status, httpStatusCode, `{error:"error getting health check status"}`, w)
 }
 
 func (s *Service) metadataHandler(w http.ResponseWriter, _ *http.Request) {

@@ -275,11 +275,11 @@ func TestLogToConsole(t *testing.T) {
 func execute(t *testing.T, scenarios []scenario, tempDir string) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			b := env.Backup()
+			b := test.DoBackupEnv()
 			setEnvs(s.envs)
 			setTempDir(tempDir)
 			t.Cleanup(func() {
-				env.Restore(b)
+				test.RestoreEnv(b)
 			})
 			var w *os.File
 			var r io.Reader
@@ -371,7 +371,7 @@ func setEnvs(envs []string) {
 }
 
 func setTempDir(tempDir string) {
-	os.Setenv(env.WorkDirVar, tempDir)
+	os.Setenv(env.VarWorkDir, tempDir)
 	os.Setenv(env.Basedir(), tempDir)
 }
 

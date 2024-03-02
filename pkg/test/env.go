@@ -1,11 +1,22 @@
-package env
+package test
 
 import (
+	"fmt"
 	"os"
 	"strings"
 )
 
-type BackupVals struct {
+func SetargsV(name string, value string) {
+	os.Args = append(os.Args, fmt.Sprintf("--env:%s=%s", name, value))
+}
+
+func Setargs(args ...string) {
+	for _, arg := range args {
+		os.Args = append(os.Args, fmt.Sprintf("--env:%s", arg))
+	}
+}
+
+type BackupEnvData struct {
 	args   []string
 	envs   []string
 	stdout *os.File
@@ -13,12 +24,12 @@ type BackupVals struct {
 	stdin  *os.File
 }
 
-func Backup() BackupVals {
+func DoBackupEnv() BackupEnvData {
 	old := os.Args
 	newArgs := make([]string, len(old))
 	copy(newArgs, os.Args)
 	os.Args = newArgs
-	return BackupVals{
+	return BackupEnvData{
 		args:   old,
 		envs:   os.Environ(),
 		stdout: os.Stdout,
@@ -27,7 +38,7 @@ func Backup() BackupVals {
 	}
 }
 
-func Restore(b BackupVals) {
+func RestoreEnv(b BackupEnvData) {
 	os.Args = b.args
 	os.Clearenv()
 	for _, ss := range b.envs {

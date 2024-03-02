@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/service"
 	httpsvc "github.com/andrescosta/goico/pkg/service/http"
+	"github.com/andrescosta/goico/pkg/test"
 	"github.com/gorilla/mux"
 )
 
@@ -58,10 +58,10 @@ func NewService(ctx context.Context, handlers []PathHandler, hfn httpsvc.HealthC
 
 func SetHTTPServerTimeouts(t time.Duration) {
 	timeout := t.String()
-	env.SetargsV("http.timeout.write", timeout)
-	env.SetargsV("http.timeout.read", timeout)
-	env.SetargsV("http.timeout.idle", timeout)
-	env.SetargsV("http.timeout.handler", timeout)
+	test.SetargsV("http.timeout.write", timeout)
+	test.SetargsV("http.timeout.read", timeout)
+	test.SetargsV("http.timeout.idle", timeout)
+	test.SetargsV("http.timeout.handler", timeout)
 }
 
 func NewSidecar(ctx context.Context, hfn httpsvc.HealthCheckFn) (*Service, error) {

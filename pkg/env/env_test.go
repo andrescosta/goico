@@ -304,11 +304,11 @@ func TestLoad(t *testing.T) {
 }
 
 func TestLoadErrors(t *testing.T) {
-	b := env.Backup()
+	b := test.DoBackupEnv()
 	t.Cleanup(func() {
-		env.Restore(b)
+		test.RestoreEnv(b)
 	})
-	os.Setenv(env.EnviromentVar, "nope")
+	os.Setenv(env.VarEnviroment, "nope")
 	loaded, _, err := env.Load(serviceName)
 	if loaded {
 		t.Error("expected not loaded got loaded")
@@ -316,7 +316,7 @@ func TestLoadErrors(t *testing.T) {
 	if err == nil {
 		t.Error("expected error got <nil>")
 	}
-	if err := os.Setenv(env.EnviromentVar, env.Development); err != nil {
+	if err := os.Setenv(env.VarEnviroment, env.Development); err != nil {
 		t.Errorf("not expected error got %v", err)
 	}
 	if loaded {
@@ -325,9 +325,9 @@ func TestLoadErrors(t *testing.T) {
 }
 
 func TestDirs(t *testing.T) {
-	b := env.Backup()
+	b := test.DoBackupEnv()
 	t.Cleanup(func() {
-		env.Restore(b)
+		test.RestoreEnv(b)
 	})
 	tempDir := t.TempDir()
 	initializeDirVars(tempDir)
@@ -449,16 +449,16 @@ func TestInvalid(t *testing.T) {
 }
 
 func initializeScenario(t *testing.T, s scenario) {
-	b := env.Backup()
+	b := test.DoBackupEnv()
 	t.Cleanup(func() {
-		env.Restore(b)
+		test.RestoreEnv(b)
 	})
 
 	tempDir := t.TempDir()
 	initializeDirVars(tempDir)
 
 	if s.environment != "" {
-		os.Setenv(env.EnviromentVar, s.environment)
+		os.Setenv(env.VarEnviroment, s.environment)
 	}
 	if s.args != nil {
 		for idx, e := range s.args {
@@ -474,8 +474,8 @@ func initializeScenario(t *testing.T, s scenario) {
 }
 
 func initializeDirVars(tempDir string) {
-	os.Setenv(env.BaseDirVar, tempDir)
-	os.Setenv(env.WorkDirVar, tempDir)
+	os.Setenv(env.VarBaseDir, tempDir)
+	os.Setenv(env.VarWorkDir, tempDir)
 }
 
 func assertValue(t *testing.T, en envv) {

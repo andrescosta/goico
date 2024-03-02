@@ -400,9 +400,9 @@ func validateResponse(t *testing.T, resp *http.Response, statuscode int, body st
 func run(t *testing.T, ss []scenario) {
 	for _, s := range ss {
 		t.Run(s.sname(), func(t *testing.T) {
-			b := env.Backup()
+			b := test.DoBackupEnv()
 			t.Cleanup(func() {
-				env.Restore(b)
+				test.RestoreEnv(b)
 			})
 			setEnv(s.env())
 			_, _, err := env.Load("echo")
@@ -481,10 +481,10 @@ func decodejson(b []byte, d any) error {
 
 func setEnv(e []string) {
 	if e != nil {
-		env.Setargs(e...)
+		test.Setargs(e...)
 		return
 	}
-	env.Setargs("metadata.enabled=true")
-	env.Setargs("metadata.enabled.sidecar=true")
+	test.Setargs("metadata.enabled=true")
+	test.Setargs("metadata.enabled.sidecar=true")
 	httptest.SetHTTPServerTimeouts(1 * time.Second)
 }
