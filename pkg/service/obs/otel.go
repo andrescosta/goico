@@ -8,6 +8,7 @@ import (
 
 	"github.com/andrescosta/goico/pkg/env"
 	"github.com/andrescosta/goico/pkg/service/meta"
+	"github.com/go-logr/zerologr"
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
@@ -63,6 +64,7 @@ func New(ctx context.Context, info meta.Data) (*OtelProvider, error) {
 	if err != nil {
 		return nil, err
 	}
+	otel.SetLogger(zerologr.New(logger))
 	// Configuring Otel Signals:  Metrics(meters), traces, baggage (logs not implemented by otel)
 	otel.SetTextMapPropagator(newPropagator())
 	// Set exporters
