@@ -2,15 +2,18 @@ package service
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/andrescosta/goico/pkg/env"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/timeout"
 	rpc "google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 )
@@ -27,7 +30,7 @@ var ErrEmptyAddress = errors.New("address is empty")
 
 type (
 	GrpcDialer interface {
-		Dial(ctx context.Context, addr string) (*rpc.ClientConn, error)
+		Dial(ctx context.Context, addr string, o ...rpc.DialOption) (*rpc.ClientConn, error)
 	}
 	GrpcListener interface {
 		Listen(addr string) (net.Listener, error)
@@ -69,11 +72,17 @@ func (s HTTPConn) ListenerOrDefault() HTTPListener {
 
 type NetConn struct{}
 
-func (NetConn) Dial(_ context.Context, addr string) (*rpc.ClientConn, error) {
+func (NetConn) Dial(_ context.Context, addr string, _ ...rpc.DialOption) (*rpc.ClientConn, error) {
 	if addr == "" {
 		return nil, ErrEmptyAddress
 	}
-	c, err := rpc.Dial(addr, rpc.WithTransportCredentials(insecure.NewCredentials()))
+	var creds credentials.TransportCredentials
+	if strings.HasSuffix(addr, ":443") {
+		creds = credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})
+	} else {
+		creds = insecure.NewCredentials()
+	}
+	c, err := rpc.Dial(addr, rpc.WithTransportCredentials(creds))
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +119,7 @@ func NewBufConnWithTimeout(timeout time.Duration) *BufConn {
 	}
 }
 
-func (t *BufConn) Dial(_ context.Context, addr string) (*rpc.ClientConn, error) {
+func (t *BufConn) Dial(_ context.Context, addr string, _ ...rpc.DialOption) (*rpc.ClientConn, error) {
 	if addr == "" {
 		return nil, ErrEmptyAddress
 	}
