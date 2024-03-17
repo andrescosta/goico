@@ -71,7 +71,7 @@ func (s *Server) NoEcho(context.Context, *EchoRequest) (*Void, error) {
 }
 
 func (s *Service) Serve() error {
-	return s.service.DoServe(s.listener, nil)
+	return s.service.DoServe(s.listener)
 }
 
 func (s *Service) Dispose() {
