@@ -1,6 +1,7 @@
 package env
 
 import (
+	"flag"
 	"os"
 	"strings"
 )
@@ -17,6 +18,7 @@ func setEnvs(args []string) error {
 			if err := os.Setenv(k, v); err != nil {
 				return err
 			}
+			_ = flag.String("env:"+k, v, "server address")
 		}
 	}
 	return nil

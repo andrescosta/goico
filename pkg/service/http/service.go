@@ -282,10 +282,6 @@ func (s *Service) initializeRouterSidecar(opt SidecarOptions) (router *mux.Route
 	//// setting middlewares
 	rf := RecoveryFunc{StackLevel: opt.common.stackLevelOnError}
 	router.Use(rf.TryToRecover())
-	router.Use(obs.GetLoggingMiddleware)
-	if !opt.disableOtel {
-		s.base.OtelProvider.InstrRouter(s.base.Name(), router)
-	}
 	if env.Bool("metadata.enabled.sidecar", false) {
 		router.HandleFunc("/meta", s.metadataHandler)
 	}
