@@ -1,19 +1,16 @@
 package collection
 
-type void struct{}
+type (
+	void              struct{}
+	Set[T comparable] map[T]void
+)
 
-type Set[T comparable] struct {
-	theset map[T]void
-}
-
-func NewSet[T comparable](values ...T) *Set[T] {
+func NewSet[T comparable](values ...T) Set[T] {
 	return NewSetFn(values, func(v T) T { return v })
 }
 
-func NewSetFn[T comparable, Y any](values []Y, fn func(Y) T) *Set[T] {
-	s := &Set[T]{
-		theset: make(map[T]void),
-	}
+func NewSetFn[T comparable, Y any](values []Y, fn func(Y) T) Set[T] {
+	s := make(Set[T])
 	for _, v := range values {
 		s.Add(fn(v))
 	}
@@ -21,22 +18,22 @@ func NewSetFn[T comparable, Y any](values []Y, fn func(Y) T) *Set[T] {
 }
 
 func (s Set[T]) Add(t T) {
-	s.theset[t] = void{}
+	s[t] = void{}
 }
 
 func (s Set[T]) Has(t T) (ok bool) {
-	_, ok = s.theset[t]
+	_, ok = s[t]
 	return
 }
 
 func (s Set[T]) Delete(t T) (ok bool) {
 	r := s.Has(t)
-	delete(s.theset, t)
+	delete(s, t)
 	return r
 }
 
 func (s Set[T]) Size() int {
-	return len(s.theset)
+	return len(s)
 }
 
 func (s Set[T]) Values() []T {
@@ -51,7 +48,7 @@ func (s Set[T]) Values() []T {
 }
 
 func (s Set[T]) Range(fn func(T) bool) {
-	for k := range s.theset {
+	for k := range s {
 		if !fn(k) {
 			return
 		}
