@@ -1,6 +1,9 @@
 package collection
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 func FirstOrDefault[T any](ds []T, df T) T {
 	d := df
@@ -19,4 +22,15 @@ func UnwrapError(err error) []error {
 		errorSlice = k.Unwrap()
 	}
 	return errorSlice
+}
+
+func JoinOf[T any](t []T, sep string, fn func(T) string) string {
+	b := strings.Builder{}
+	for i, v := range t {
+		if i > 0 {
+			b.WriteString(sep)
+		}
+		b.WriteString(fn(v))
+	}
+	return b.String()
 }
