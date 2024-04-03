@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/andrescosta/goico/pkg/env"
@@ -121,8 +122,17 @@ func New(opts ...Option) (*Service, error) {
 		if opt.pprofAddr == nil {
 			return nil, errors.New("pprofAddr is nill and profilingEnabled is true")
 		}
+		baseSideCar, err := service.New(
+			service.WithName("pprof"),
+			service.WithAddr(*opt.pprofAddr),
+			service.WithContext(opt.ctx),
+			service.WithKind("pprof"),
+		)
+		if err != nil {
+			return nil, err
+		}
 		sidecar, err := http.NewSidecar(
-			http.WithPrimaryService(svc.base),
+			http.WithPrimaryService(baseSideCar),
 			http.WithListener[*http.SidecarOptions](opt.listener),
 			http.WithInitRoutesFn[*http.SidecarOptions](func(_ context.Context, r *mux.Router) error {
 				service.AttachProfilingHandlers(r)
@@ -139,22 +149,14 @@ func New(opts ...Option) (*Service, error) {
 }
 
 func (g *Service) Serve() error {
-	var listenerSidecar net.Listener
-	if g.sidecarService != nil {
-		var err error
-		listenerSidecar, err = g.sidecarService.Listener.Listen(*g.pprofAddr)
-		if err != nil {
-			return err
-		}
-	}
 	listener, err := g.listener.Listen(g.base.Addr)
 	if err != nil {
 		return err
 	}
-	return g.DoServe(listener, listenerSidecar)
+	return g.DoServe(listener)
 }
 
-func (g *Service) DoServe(listener net.Listener, listenerSidecar net.Listener) error {
+func (g *Service) DoServe(listener net.Listener) error {
 	defer g.base.Stop()
 	logger := zerolog.Ctx(g.base.Ctx)
 	logger.Info().Msgf("Starting process %d ", os.Getpid())
@@ -177,9 +179,13 @@ func (g *Service) DoServe(listener net.Listener, listenerSidecar net.Listener) e
 	if g.healthCheck != nil {
 		go g.healthcheckIt(g.base.Ctx)
 	}
-	if listenerSidecar != nil {
+
+	var w sync.WaitGroup
+	if g.sidecarService != nil {
+		w.Add(1)
 		go func() {
-			if err := g.sidecarService.DoServe(listenerSidecar); err != nil {
+			defer w.Done()
+			if err := g.sidecarService.Serve(); err != nil {
 				logger.Err(err).Msg("error helper service")
 			}
 		}()
@@ -187,7 +193,7 @@ func (g *Service) DoServe(listener net.Listener, listenerSidecar net.Listener) e
 	if err := g.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
-
+	w.Wait()
 	logger.Debug().Msg("GRPC Server: stopped")
 	logger.Info().Msgf("Process %d ended ", os.Getpid())
 	return nil

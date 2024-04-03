@@ -29,6 +29,8 @@ type Service struct {
 	imsidecar       bool
 	Listener        service.HTTPListener
 	serviceStatusFn ServiceStatus
+	sidecarService  *Service
+	pprofAddr       *string
 }
 
 type (
@@ -58,6 +60,7 @@ type ServiceOptions struct {
 	ctx              context.Context
 	name             string
 	profilingEnabled bool
+	pprofAddr        *string
 }
 
 type commonOptions struct {
@@ -106,6 +109,36 @@ func New(opts ...Option[*ServiceOptions]) (*Service, error) {
 	//// routes initialization
 	if err := opt.common.initRoutesFn(svc.base.Ctx, router); err != nil {
 		return nil, err
+	}
+
+	// Profiling sidecar
+	if opt.profilingEnabled {
+		if opt.pprofAddr == nil {
+			return nil, errors.New("pprofAddr is nill and profilingEnabled is true")
+		}
+
+		baseSideCar, err := service.New(
+			service.WithName("pprof"),
+			service.WithAddr(*opt.pprofAddr),
+			service.WithContext(opt.ctx),
+			service.WithKind("pprof"),
+		)
+		if err != nil {
+			return nil, err
+		}
+		sidecar, err := NewSidecar(
+			WithPrimaryService(baseSideCar),
+			WithListener[*SidecarOptions](opt.common.listener),
+			WithInitRoutesFn[*SidecarOptions](func(_ context.Context, r *mux.Router) error {
+				service.AttachProfilingHandlers(r)
+				return nil
+			}),
+		)
+		if err != nil {
+			return nil, err
+		}
+		svc.sidecarService = sidecar
+		svc.pprofAddr = opt.pprofAddr
 	}
 	return svc, nil
 }
@@ -164,7 +197,19 @@ func (s *Service) DoServe(listener net.Listener) error {
 		errCh <- s.server.Shutdown(shutdownCtx)
 	}()
 
+	var w sync.WaitGroup
+	if s.sidecarService != nil {
+		w.Add(1)
+		go func() {
+			defer w.Done()
+			if err := s.sidecarService.Serve(); err != nil {
+				logger.Err(err).Msg("error helper service")
+			}
+		}()
+	}
+
 	logger.Debug().Msgf("HTTP service: started on %s", listener.Addr().String())
+
 	if !s.imsidecar {
 		s.base.SetStartedNow()
 	}
@@ -176,6 +221,7 @@ func (s *Service) DoServe(listener net.Listener) error {
 	if err := <-errCh; err != nil {
 		return fmt.Errorf("http.Shutdown: failed to shutdown server: %w", err)
 	}
+	w.Wait()
 	logger.Info().Msgf("Process %d ended ", os.Getpid())
 	return nil
 }
@@ -226,9 +272,6 @@ func (s *Service) initializeRouter(opts *ServiceOptions) (router *mux.Router) {
 		s.healthCheckFunc = opts.common.healthChkFn
 		router.HandleFunc("/health", s.healthCheckHandler)
 	}
-	if opts.profilingEnabled {
-		service.AttachProfilingHandlers(router)
-	}
 	s.server = newHTTPServer(router)
 	return
 }
@@ -239,10 +282,6 @@ func (s *Service) initializeRouterSidecar(opt SidecarOptions) (router *mux.Route
 	//// setting middlewares
 	rf := RecoveryFunc{StackLevel: opt.common.stackLevelOnError}
 	router.Use(rf.TryToRecover())
-	router.Use(obs.GetLoggingMiddleware)
-	if !opt.disableOtel {
-		s.base.OtelProvider.InstrRouter(s.base.Name(), router)
-	}
 	if env.Bool("metadata.enabled.sidecar", false) {
 		router.HandleFunc("/meta", s.metadataHandler)
 	}
@@ -370,5 +409,11 @@ func WithServiceStatusFn(f ServiceStatus) Option[*SidecarOptions] {
 func WithProfilingEnabled(p bool) Option[*ServiceOptions] {
 	return option.NewFuncOption(func(s *ServiceOptions) {
 		s.profilingEnabled = p
+	})
+}
+
+func WithPProfAddr(addr *string) Option[*ServiceOptions] {
+	return option.NewFuncOption(func(r *ServiceOptions) {
+		r.pprofAddr = addr
 	})
 }
