@@ -99,7 +99,7 @@ func TestFileExists(t *testing.T) {
 	if ok {
 		t.Fatalf("The file should not exists: %s ", fileName)
 	}
-	err = os.WriteFile(fileName, []byte("content"), os.ModeAppend)
+	err = os.WriteFile(fileName, []byte("content"), os.ModePerm)
 	test.Nil(t, err)
 	ok, err = FileExists(fileName)
 	test.Nil(t, err)
@@ -414,7 +414,7 @@ func makeTestTree(t *testing.T, n *node, baseDir string, waiter func()) {
 	t.Helper()
 	entryName := filepath.Join(baseDir, n.name)
 	if n.entries == nil {
-		err := os.WriteFile(entryName, []byte(n.name), os.ModeAppend)
+		err := os.WriteFile(entryName, []byte(n.name), os.ModePerm)
 		test.Nil(t, err)
 		if waiter != nil {
 			waiter()
@@ -484,7 +484,7 @@ func createFile(t *testing.T, name string, lines int, preffix string, suffix str
 		}
 		buffer.Write([]byte(fmt.Sprintf("%s%s%s", preffix, strconv.Itoa(i), suffix)))
 	}
-	if err := os.WriteFile(name, buffer.Bytes(), os.ModeAppend); err != nil {
+	if err := os.WriteFile(name, buffer.Bytes(), os.ModePerm); err != nil {
 		t.Fatalf("os.WriteFile: %s", err)
 	}
 }

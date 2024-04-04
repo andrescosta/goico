@@ -530,7 +530,7 @@ func createEnvFile(t *testing.T, dir string, name string, e envvs) {
 	t.Helper()
 	file := filepath.Join(dir, name)
 	err := os.WriteFile(file, e.bytes(t),
-		os.ModeAppend)
+		os.ModePerm)
 	test.Nil(t, err, fmt.Sprintf("os.WriteFile: error writing file %s:%s", file, err))
 }
 

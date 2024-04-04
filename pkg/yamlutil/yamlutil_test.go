@@ -35,7 +35,7 @@ func TestDecodeFile(t *testing.T) {
 	t.Parallel()
 	fileName := filepath.Join(t.TempDir(),
 		"file-decode.yaml")
-	if err := os.WriteFile(fileName, []byte(strings.TrimSpace(file)), os.ModeAppend); err != nil {
+	if err := os.WriteFile(fileName, []byte(strings.TrimSpace(file)), os.ModePerm); err != nil {
 		t.Fatalf("os.WriteFile: %s", err)
 	}
 	d := data{}
@@ -74,7 +74,7 @@ func TestMarchal(t *testing.T) {
 	t.Log(m)
 	fileName := filepath.Join(t.TempDir(),
 		"file-marchal.yaml")
-	err = os.WriteFile(fileName, []byte(*m), os.ModeAppend)
+	err = os.WriteFile(fileName, []byte(*m), os.ModePerm)
 	test.Nil(t, err)
 	d := data{}
 	err = DecodeFile(fileName, &d)
@@ -106,7 +106,7 @@ func TestErrors(t *testing.T) {
 	test.NotNil(t, err)
 	fileName := filepath.Join(t.TempDir(),
 		"file-errors.yaml")
-	err = os.WriteFile(fileName, []byte("aaasssdshjk"), os.ModeAppend)
+	err = os.WriteFile(fileName, []byte("aaasssdshjk"), os.ModePerm)
 	test.Nil(t, err)
 	d = data{}
 	err = DecodeFile(fileName, &d)
