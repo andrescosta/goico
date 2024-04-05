@@ -80,7 +80,6 @@ type (
 )
 
 func Test(t *testing.T) {
-	t.SkipNow()
 	scenarios := []scenario{
 		&scenarioresult{
 			config:    config{"test_ok", echo},
@@ -147,7 +146,6 @@ func Test(t *testing.T) {
 }
 
 func TestUsingGoroutines(t *testing.T) {
-	t.SkipNow()
 	dir := t.TempDir()
 	ctx := context.Background()
 	runtime, err := wasm.NewRuntimeWithCompilationCache(dir)

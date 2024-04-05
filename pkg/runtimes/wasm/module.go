@@ -34,10 +34,23 @@ type EventFuncResult struct {
 	StrPtrEncoded uint64
 }
 
+type importMode uint
+
+const (
+	modeDefault importMode = iota
+	modeWasi
+	modeWasiUnstable
+)
+
 const (
 	TypeDefault ModuleType = iota
 	TypeRust
 )
+
+type EnvVar struct {
+	Key   string
+	Value string
+}
 
 func NewModule(ctx context.Context, runtime *Runtime, wasmModule []byte, mainFuncName string, logExt LogFn) (*Module, error) {
 	wm := &Module{
@@ -46,7 +59,6 @@ func NewModule(ctx context.Context, runtime *Runtime, wasmModule []byte, mainFun
 
 	wazeroRuntime := wazero.NewRuntimeWithConfig(ctx, runtime.runtimeConfig)
 
-	// DON'T MOVE IT.
 	_, err := wazeroRuntime.NewHostModuleBuilder("env").
 		NewFunctionBuilder().WithFunc(wm.log).Export("log").
 		Instantiate(ctx)
