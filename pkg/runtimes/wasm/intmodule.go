@@ -57,6 +57,7 @@ func NewIntModule(ctx context.Context, runtime *Runtime, wasmModule []byte, logE
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("module compiled")
 	switch detectImports(guest.ImportedFunctions()) {
 	case modeWasi:
 		wasi_snapshot_preview1.MustInstantiate(ctx, rt)
