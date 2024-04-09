@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andrescosta/goico/pkg/collection"
 	"github.com/andrescosta/goico/pkg/runtimes/wasm"
 	"github.com/andrescosta/goico/pkg/test"
 )
@@ -57,7 +58,7 @@ type (
 	scenariolog struct {
 		config
 		inputdata
-		logs         map[string]logvalue
+		logs         *collection.SyncMap[string, logvalue]
 		logsexpected []logvalue
 	}
 )
@@ -113,7 +114,7 @@ func Test(t *testing.T) {
 				{message: "_fatal", lvl: 4},
 				{message: "_panic", lvl: 5},
 			},
-			logs: make(map[string]logvalue),
+			logs: collection.NewSyncMap[string, logvalue](),
 		},
 		&scenariolog{
 			config:       config{"log_nook", logw},
@@ -123,114 +124,39 @@ func Test(t *testing.T) {
 	}
 	dir := t.TempDir()
 	ctx := context.Background()
-	runtime, err := wasm.NewRuntimeWithCompilationCache(dir)
-	test.Nil(t, err)
-	defer func() {
-		runtime.Close(ctx)
-	}()
+	wg := sync.WaitGroup{}
 	for _, s := range scenarios {
 		t.Run(s.name(), func(t *testing.T) {
-			m, err := wasm.NewModule(ctx, runtime, s.wasm(), "event", s.logFn())
+			m, err := wasm.NewJobicoletModule(ctx, dir, s.wasm(), "event", s.logFn())
 			test.Nil(t, err)
 			t.Cleanup(func() {
-				m.Close(ctx)
+				if m != nil {
+					m.Close(ctx)
+				}
 			})
-			msg := s.input()
-			ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-			defer cancel()
-			code, str, err := m.Run(ctx, msg)
-			s.validateError(t, err)
-			s.validate(t, code, str)
+			n := 5
+			for i := 0; i < n; i++ {
+				wg.Add(1)
+				go func(i int, s scenario) {
+					defer wg.Done()
+					msg := s.input()
+					ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+					defer cancel()
+					code, str, err := m.Run(ctx, msg)
+					s.validateError(t, err)
+					s.validate(t, code, str)
+				}(i, s)
+			}
+			wg.Wait()
 		})
 	}
-}
-
-func TestUsingGoroutines(t *testing.T) {
-	dir := t.TempDir()
-	ctx := context.Background()
-	runtime, err := wasm.NewRuntimeWithCompilationCache(dir)
-	test.Nil(t, err)
-	defer func() {
-		err := runtime.Close(ctx)
-		test.Nil(t, err)
-	}()
-
-	wgready := sync.WaitGroup{}
-	wg := sync.WaitGroup{}
-
-	scenarios := []scenario{
-		&scenarioresult{
-			config:    config{"test_ok", echo},
-			inputdata: inputdata{"test_ok", 0},
-		},
-		&scenarioresult{
-			config:    config{"Hello, from a rusty script!", greetrust},
-			inputdata: inputdata{"Hello, from a rusty script!", 0},
-		},
-		&scenarioresult{
-			config:    config{"test_error", doerror},
-			inputdata: inputdata{"test_error", 500},
-		},
-		&scenariowitherror{
-			config:    config{"test_error", panicw},
-			inputdata: inputdata{"test_error", 500},
-		},
-		&scenariowitherror{
-			config:    config{"test_infine_loop", sleeper},
-			inputdata: inputdata{"test_infine_loop", 500},
-		},
-		&scenariolog{
-			config:    config{"log", logw},
-			inputdata: inputdata{"log_ok_", 10},
-			logsexpected: []logvalue{
-				{message: "_nolevel", lvl: 6},
-				{message: "_info", lvl: 1},
-				{message: "_debug", lvl: 0},
-				{message: "_warn", lvl: 2},
-				{message: "_error", lvl: 3},
-				{message: "_fatal", lvl: 4},
-				{message: "_panic", lvl: 5},
-			},
-			logs: make(map[string]logvalue),
-		},
-		&scenariolog{
-			config:       config{"log_nook", logw},
-			inputdata:    inputdata{"log_ok_", 10},
-			logsexpected: nil,
-		},
-	}
-
-	for _, s := range scenarios {
-		wg.Add(1)
-		wgready.Add(1)
-		go func(s scenario) {
-			defer wg.Done()
-			t.Run(s.name()+"_goroutine", func(t *testing.T) {
-				m, err := wasm.NewModule(ctx, runtime, s.wasm(), "event", s.logFn())
-				test.Nil(t, err)
-				t.Cleanup(func() {
-					err := m.Close(ctx)
-					test.Nil(t, err)
-				})
-				msg := s.input()
-				wgready.Done()
-				wgready.Wait()
-				ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-				code, str, err := m.Run(ctx, msg)
-				cancel()
-				s.validateError(t, err)
-				s.validate(t, code, str)
-			})
-		}(s)
-	}
-	wg.Wait()
 }
 
 func (s *scenariolog) log(_ context.Context, lvl uint32, message string) error {
 	if s.logsexpected == nil {
 		return errors.New("error")
 	}
-	s.logs[message] = logvalue{message, lvl}
+	s.logs.Store(message, logvalue{message, lvl})
 	return nil
 }
 
@@ -240,7 +166,7 @@ func (s *scenariowitherror) validate(*testing.T, uint64, string) {
 func (s *scenariolog) validate(t *testing.T, code uint64, message string) {
 	for _, l := range s.logsexpected {
 		line := s.message + l.message
-		le, ok := s.logs[line]
+		le, ok := s.logs.Load(line)
 		if !ok {
 			t.Errorf(line + " not sent")
 			continue
@@ -274,10 +200,12 @@ func (s *scenariolog) validateError(t *testing.T, err error) {
 }
 
 func (*scenariowitherror) validateError(t *testing.T, err error) {
+	t.Helper()
 	test.NotNil(t, err)
 }
 
 func (*scenarioresult) validateError(t *testing.T, err error) {
+	t.Helper()
 	test.Nil(t, err)
 }
 

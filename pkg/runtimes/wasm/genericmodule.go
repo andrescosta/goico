@@ -3,6 +3,7 @@ package wasm
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,44 +16,37 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
-type IntModule struct {
-	runtime wazero.Runtime
-	module  wazero.CompiledModule
-	conf    wazero.ModuleConfig
+// Part of this code was copied from https://github.com/tetratelabs/wazero/blob/c6a907bb9d6c4605355562859e7cd2fae67fd246/cmd/wazero/wazero.go
+
+type GenericModule struct {
+	runtime  wazero.Runtime
+	module   wazero.CompiledModule
+	conf     wazero.ModuleConfig
+	cacheDir *string
+	cache    wazero.CompilationCache
 }
 
-func (i *IntModule) Run(ctx context.Context) error {
-	_, err := i.runtime.InstantiateModule(ctx, i.module, i.conf)
-	if err != nil {
-		return err
+func NewGenericModule(ctx context.Context, tempDir string, wasmModule []byte, logExt LogFn) (*GenericModule, error) {
+	if tempDir == "" {
+		return nil, errors.New("directory cannot be empty")
 	}
-	return nil
-}
-
-func (i *IntModule) Close(ctx context.Context) error {
-	return i.module.Close(ctx)
-}
-
-func NewIntModule(ctx context.Context, runtime *Runtime, wasmModule []byte, logExt LogFn, mounts []string, args []string, env []EnvVar, in io.Reader, out io.Writer, outErr io.Writer) (*IntModule, error) {
-	_, fsConfig, err := validateMounts(mounts)
+	if err := os.MkdirAll(tempDir, 0o700); err != nil {
+		return nil, err
+	}
+	cacheDir, err := os.MkdirTemp(tempDir, "cache")
 	if err != nil {
 		return nil, err
 	}
-
-	conf := wazero.NewModuleConfig().
-		WithRandSource(rand.Reader).
-		WithFSConfig(fsConfig).
-		WithSysNanosleep().
-		WithSysNanotime().
-		WithSysWalltime().
-		WithArgs(args...).
-		WithStdout(out).
-		WithStderr(outErr).
-		WithStdin(in)
-	for _, e := range env {
-		conf = conf.WithEnv(e.Key, e.Value)
+	cache, err := wazero.NewCompilationCacheWithDir(cacheDir)
+	if err != nil {
+		err := os.RemoveAll(cacheDir)
+		return nil, err
 	}
-	rt := wazero.NewRuntimeWithConfig(ctx, runtime.runtimeConfig)
+	runtimeConfig := wazero.NewRuntimeConfig().
+		WithCompilationCache(cache).
+		WithCloseOnContextDone(true)
+
+	rt := wazero.NewRuntimeWithConfig(ctx, runtimeConfig)
 	guest, err := rt.CompileModule(ctx, wasmModule)
 	if err != nil {
 		return nil, err
@@ -69,16 +63,42 @@ func NewIntModule(ctx context.Context, runtime *Runtime, wasmModule []byte, logE
 			return nil, err
 		}
 	case modeDefault:
-		_, err = rt.InstantiateModule(ctx, guest, conf)
-		if err != nil {
-			return nil, err
-		}
+		//
 	}
-	return &IntModule{
-		conf:    conf,
-		runtime: rt,
-		module:  guest,
+	return &GenericModule{
+		cacheDir: &tempDir,
+		cache:    cache,
+		runtime:  rt,
+		module:   guest,
 	}, nil
+}
+
+func (i *GenericModule) Run(ctx context.Context, mounts []string, args []string, env []EnvVar, in io.Reader, out io.Writer, outErr io.Writer) error {
+	_, fsConfig, err := validateMounts(mounts)
+	if err != nil {
+		return err
+	}
+
+	conf := wazero.NewModuleConfig().
+		WithRandSource(rand.Reader).
+		WithFSConfig(fsConfig).
+		WithSysNanosleep().
+		WithSysNanotime().
+		WithSysWalltime().
+		WithArgs(args...).
+		WithStdout(out).
+		WithStderr(outErr).
+		WithStdin(in)
+	for _, e := range env {
+		conf = conf.WithEnv(e.Key, e.Value)
+	}
+
+	mod, err := i.runtime.InstantiateModule(ctx, i.module, conf)
+	if err != nil {
+		return err
+	}
+	defer mod.Close(ctx)
+	return nil
 }
 
 func validateMounts(mounts []string) (rootPath string, config wazero.FSConfig, err error) {
@@ -118,15 +138,14 @@ func validateMounts(mounts []string) (rootPath string, config wazero.FSConfig, e
 
 		config = config.(sysfs.FSConfig).WithSysFSMount(root, guestPath)
 
-		if StripPrefixesAndTrailingSlash(guestPath) == "" {
+		if stripPrefixesAndTrailingSlash(guestPath) == "" {
 			rootPath = dir
 		}
 	}
 	return rootPath, config, nil
 }
 
-func StripPrefixesAndTrailingSlash(path string) string {
-	// strip trailing slashes
+func stripPrefixesAndTrailingSlash(path string) string {
 	pathLen := len(path)
 	for ; pathLen > 0 && path[pathLen-1] == '/'; pathLen-- {
 	}
@@ -164,4 +183,18 @@ func detectImports(imports []api.FunctionDefinition) importMode {
 		}
 	}
 	return modeDefault
+}
+
+func (r *GenericModule) Close(ctx context.Context) error {
+	var errs error
+	if r.module != nil {
+		errs = errors.Join(errs, r.module.Close(ctx))
+	}
+	if r.cache != nil {
+		errs = errors.Join(errs, r.cache.Close(ctx))
+	}
+	if r.cacheDir != nil {
+		errs = errors.Join(errs, os.RemoveAll(*r.cacheDir))
+	}
+	return errs
 }
