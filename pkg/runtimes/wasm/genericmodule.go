@@ -21,7 +21,6 @@ import (
 type GenericModule struct {
 	runtime  wazero.Runtime
 	module   wazero.CompiledModule
-	conf     wazero.ModuleConfig
 	cacheDir *string
 	cache    wazero.CompilationCache
 }
@@ -51,7 +50,7 @@ func NewGenericModule(ctx context.Context, tempDir string, wasmModule []byte, lo
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("module compiled")
+
 	switch detectImports(guest.ImportedFunctions()) {
 	case modeWasi:
 		wasi_snapshot_preview1.MustInstantiate(ctx, rt)

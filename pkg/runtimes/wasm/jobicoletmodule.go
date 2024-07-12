@@ -3,6 +3,7 @@ package wasm
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -24,7 +25,7 @@ type JobicoletModule struct {
 	mainFuncName string
 	mod          wazero.CompiledModule
 	rt           wazero.Runtime
-	cacheDir     *string
+	cacheDir     string
 	cache        wazero.CompilationCache
 	logFn        LogFn
 }
@@ -82,16 +83,18 @@ func NewJobicoletModule(ctx context.Context, tempDir string, wasmModule []byte, 
 		WithCloseOnContextDone(true)
 
 	rt := wazero.NewRuntimeWithConfig(ctx, runtimeConfig)
+	module, err := rt.CompileModule(ctx, wasmModule)
+	if err != nil {
+		return nil, err
+	}
 
 	mod := &JobicoletModule{
 		rt:           rt,
 		mainFuncName: mainFuncName,
 		logFn:        logExt,
-	}
-
-	module, err := rt.CompileModule(ctx, wasmModule)
-	if err != nil {
-		return nil, err
+		cacheDir:     cacheDir,
+		cache:        cache,
+		mod:          module,
 	}
 
 	switch detectImports(module.ImportedFunctions()) {
@@ -115,7 +118,6 @@ func NewJobicoletModule(ctx context.Context, tempDir string, wasmModule []byte, 
 		return nil, err
 	}
 
-	mod.mod = module
 	return mod, nil
 }
 
@@ -124,7 +126,12 @@ func (f *JobicoletModule) Run(ctx context.Context, data string) (uint64, string,
 
 	// active module preparation
 	activeModule := activeModule{}
-	conf := wazero.NewModuleConfig()
+	conf := wazero.NewModuleConfig().
+		WithRandSource(rand.Reader).
+		WithSysNanosleep().
+		WithSysNanotime().
+		WithSysWalltime()
+
 	module, err := f.rt.InstantiateModule(ctx, f.mod, conf)
 	if err != nil {
 		return 0, "", err
@@ -279,11 +286,7 @@ func (f *JobicoletModule) log(ctx context.Context, module api.Module, level, off
 
 func (r *JobicoletModule) Close(ctx context.Context) error {
 	var errs error
-	if r.cache != nil {
-		errs = errors.Join(errs, r.cache.Close(ctx))
-	}
-	if r.cacheDir != nil {
-		errs = errors.Join(errs, os.RemoveAll(*r.cacheDir))
-	}
+	errs = errors.Join(errs, r.cache.Close(ctx))
+	errs = errors.Join(errs, os.RemoveAll(r.cacheDir))
 	return errs
 }

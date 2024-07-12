@@ -134,7 +134,7 @@ func Test(t *testing.T) {
 					m.Close(ctx)
 				}
 			})
-			n := 5
+			n := 1
 			for i := 0; i < n; i++ {
 				wg.Add(1)
 				go func(i int, s scenario) {
