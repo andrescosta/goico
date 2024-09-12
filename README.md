@@ -31,7 +31,7 @@ Goico extends basic database functionality with advanced streaming for data upda
   - Using the WAZERO-based WASM runtime, Goico enables developers to implement Jobicolets in any language that compiles to WebAssembly, offering flexibility in event processing.
 
 - **Efficient Data Storage and Retrieval:**
-  - The embedded bbolt-based database provides a reliable key/value store for storing and retrieving essential data within Jobico.
+  - The embedded Pebble-based database provides a reliable key/value store for storing and retrieving essential data within Jobico.
 
 - **Real-time Monitoring and Adaptation:**
   - Goico's database streaming features enable real-time reactions to changes, allowing Jobico to dynamically adapt to evolving requirements.
